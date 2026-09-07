@@ -1,10 +1,7 @@
+import { Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { runCli } from '../api/cli'
-
-interface Line {
-  kind: 'cmd' | 'out' | 'err' | 'info'
-  text: string
-}
+import { useCliStore } from '../store/cliStore'
 
 const HELP = `AWS CLI terminal — only "aws" commands are allowed.
 Examples:
@@ -125,12 +122,14 @@ function complete(input: string): { value: string; matches: string[] } {
 }
 
 export function CliPanel() {
-  const [lines, setLines] = useState<Line[]>([
-    { kind: 'info', text: 'AWS CLI terminal. Type "help" to get started.' },
-  ])
+  const lines = useCliStore((s) => s.lines)
+  const push = useCliStore((s) => s.push)
+  const addHistory = useCliStore((s) => s.addHistory)
+  const clear = useCliStore((s) => s.clear)
+  const history = useCliStore((s) => s.history)
+
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const [history, setHistory] = useState<string[]>([])
   const [histIdx, setHistIdx] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -139,19 +138,15 @@ export function CliPanel() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [lines])
 
-  function push(...l: Line[]) {
-    setLines((prev) => [...prev, ...l])
-  }
-
   async function run(raw: string) {
     const cmd = raw.trim()
     if (!cmd) return
-    setHistory((h) => [...h, cmd])
+    addHistory(cmd)
     setHistIdx(null)
     push({ kind: 'cmd', text: `➜ ${cmd}` })
 
     if (cmd === 'clear') {
-      setLines([])
+      clear()
       return
     }
     if (cmd === 'help') {
@@ -222,6 +217,20 @@ export function CliPanel() {
       className="flex h-full flex-col bg-gray-950 font-mono text-xs text-gray-200"
       onClick={() => inputRef.current?.focus()}
     >
+      <div className="flex items-center justify-end border-b border-gray-800 px-3 py-1">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            clear()
+          }}
+          className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] text-gray-500 transition hover:bg-gray-800 hover:text-gray-300"
+          title="Clear terminal"
+        >
+          <Trash2 className="h-3 w-3" />
+          Clear
+        </button>
+      </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2">
         {lines.map((l, i) => (
           <pre
