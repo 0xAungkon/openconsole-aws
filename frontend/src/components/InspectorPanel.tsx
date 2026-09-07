@@ -1,4 +1,4 @@
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy, Download } from 'lucide-react'
 import { useState } from 'react'
 import type { LogEntry } from '../store/logStore'
 import { useLogStore } from '../store/logStore'
@@ -13,6 +13,62 @@ function responseText(e: LogEntry): string {
   }
   const payload = e.status === 'ok' ? e.result : e.error
   return JSON.stringify(payload ?? null, null, 2)
+}
+
+function triggerDownload(filename: string, text: string, mime: string) {
+  const blob = new Blob([text], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function csvCell(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`
+}
+
+function toCsv(entries: LogEntry[]): string {
+  const header = ['Time', 'Source', 'Status', 'Duration (ms)', 'Command', 'Response']
+  const rows = entries.map((e) =>
+    [
+      new Date(e.ts).toISOString(),
+      e.source,
+      e.status,
+      String(e.durationMs ?? ''),
+      e.command,
+      responseText(e),
+    ]
+      .map(csvCell)
+      .join(','),
+  )
+  return [header.map(csvCell).join(','), ...rows].join('\n')
+}
+
+function toMarkdown(entries: LogEntry[]): string {
+  const lines = ['# Inspector log', '']
+  for (const e of entries) {
+    lines.push(
+      `## ${new Date(e.ts).toLocaleString()} — ${e.source.toUpperCase()} — ${
+        e.status
+      }${e.durationMs != null ? ` (${e.durationMs} ms)` : ''}`,
+      '',
+      '**Command**',
+      '',
+      '```bash',
+      e.command,
+      '```',
+      '',
+      '**Response**',
+      '',
+      '```',
+      responseText(e),
+      '```',
+      '',
+    )
+  }
+  return lines.join('\n')
 }
 
 export function InspectorPanel() {
@@ -37,13 +93,47 @@ export function InspectorPanel() {
         <span className="font-medium text-gray-600 dark:text-gray-300">
           {entries.length} command{entries.length === 1 ? '' : 's'}
         </span>
-        <button
-          type="button"
-          onClick={clear}
-          className="rounded px-2 py-0.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-        >
-          Clear
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={entries.length === 0}
+            onClick={() =>
+              triggerDownload(
+                `inspector-${Date.now()}.csv`,
+                toCsv(entries),
+                'text/csv',
+              )
+            }
+            className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-gray-800"
+            title="Download as CSV"
+          >
+            <Download className="h-3.5 w-3.5" />
+            CSV
+          </button>
+          <button
+            type="button"
+            disabled={entries.length === 0}
+            onClick={() =>
+              triggerDownload(
+                `inspector-${Date.now()}.md`,
+                toMarkdown(entries),
+                'text/markdown',
+              )
+            }
+            className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-gray-800"
+            title="Download as Markdown"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Markdown
+          </button>
+          <button
+            type="button"
+            onClick={clear}
+            className="rounded px-2 py-0.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            Clear
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">

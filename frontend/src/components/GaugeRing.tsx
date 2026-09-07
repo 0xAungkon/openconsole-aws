@@ -26,16 +26,18 @@ export function GaugeRing({ label, fraction, centerText, caption }: GaugeRingPro
           strokeWidth={stroke}
           className="stroke-gray-100 dark:stroke-gray-800"
         />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${circ - dash}`}
-          className="stroke-brand-500 transition-[stroke-dasharray] duration-500"
-        />
+        {clamped > 0 && (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${circ - dash}`}
+            className="stroke-brand-500 transition-[stroke-dasharray] duration-500"
+          />
+        )}
         <text
           x="50%"
           y="50%"

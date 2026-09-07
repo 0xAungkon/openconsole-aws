@@ -2,9 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   Camera,
-  Check,
   HardDrive,
-  Pencil,
   Play,
   Plus,
   RefreshCw,
@@ -15,7 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { runQuery } from '../api/proxy'
 import { Card } from '../components/Card'
@@ -206,70 +204,60 @@ export function Ec2InstancePage() {
 function NameEditor({ row, instanceId }: { row: InstanceRow; instanceId: string }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(row.Name)
+  const skipSave = useRef(false)
   const rename = useEc2Mutation()
 
   useEffect(() => setName(row.Name), [row.Name])
 
-  function save() {
-    rename.mutate(
-      {
+  // Save on blur: persist only if the name actually changed and wasn't cancelled.
+  function commit() {
+    if (skipSave.current) {
+      skipSave.current = false
+      setName(row.Name)
+      setEditing(false)
+      return
+    }
+    const next = name.trim()
+    if (next && next !== row.Name) {
+      rename.mutate({
         op: 'create_tags',
-        params: { Resources: [instanceId], Tags: [{ Key: 'Name', Value: name }] },
-      },
-      { onSuccess: () => setEditing(false) },
-    )
-  }
-
-  if (editing) {
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') save()
-            if (e.key === 'Escape') setEditing(false)
-          }}
-          placeholder="Server name"
-          className="rounded-md border border-gray-300 px-2 py-1 text-lg font-semibold focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
-        />
-        <button
-          type="button"
-          onClick={save}
-          disabled={rename.isPending}
-          className="rounded-md bg-brand-500 px-2 py-1.5 text-white hover:bg-brand-600 disabled:opacity-50"
-          title="Save name"
-        >
-          <Check className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          className="rounded-md border border-gray-300 px-2 py-1.5 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-          title="Cancel"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-    )
+        params: { Resources: [instanceId], Tags: [{ Key: 'Name', Value: next }] },
+      })
+    } else {
+      setName(row.Name)
+    }
+    setEditing(false)
   }
 
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-2">
-        <h1 className="truncate text-lg font-semibold text-gray-800 dark:text-gray-100">
-          {row.Name || 'Unnamed server'}
-        </h1>
+        {editing ? (
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              if (e.key === 'Escape') {
+                skipSave.current = true
+                e.currentTarget.blur()
+              }
+            }}
+            placeholder="Server name"
+            className="-mx-1 min-w-0 max-w-xs border-0 bg-transparent px-1 py-0.5 text-lg font-semibold text-gray-800 focus:outline-none focus:ring-0 dark:text-gray-100"
+          />
+        ) : (
+          <h1
+            onClick={() => setEditing(true)}
+            title="Click to rename"
+            className="-mx-1 cursor-text truncate rounded px-1 text-lg font-semibold text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800"
+          >
+            {row.Name || 'Unnamed server'}
+          </h1>
+        )}
         <StateBadge state={row.State} size="md" />
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-brand-600 dark:hover:bg-gray-800"
-          title="Rename"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
       </div>
       <p className="font-mono text-xs text-gray-400">{row.InstanceId}</p>
     </div>

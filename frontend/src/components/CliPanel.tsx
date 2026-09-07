@@ -14,7 +14,115 @@ Examples:
   aws lambda list-functions
   aws iam list-users
 Region and endpoint are applied automatically from your session.
-Local commands: help, clear`
+Local commands: help, clear
+Tips: ↑/↓ browse history · Tab autocompletes services & subcommands`
+
+// Autocomplete dictionary: aws → service → common subcommands.
+const SERVICES = [
+  's3',
+  's3api',
+  'ec2',
+  'lambda',
+  'iam',
+  'rds',
+  'dynamodb',
+  'sts',
+  'cloudwatch',
+  'logs',
+]
+
+const SUBCOMMANDS: Record<string, string[]> = {
+  ec2: [
+    'describe-instances',
+    'describe-instance-status',
+    'describe-instance-types',
+    'run-instances',
+    'start-instances',
+    'stop-instances',
+    'reboot-instances',
+    'terminate-instances',
+    'monitor-instances',
+    'unmonitor-instances',
+    'describe-volumes',
+    'create-tags',
+    'delete-tags',
+    'describe-security-groups',
+    'modify-instance-attribute',
+    'create-image',
+    'describe-images',
+    'describe-regions',
+    'describe-availability-zones',
+  ],
+  s3: ['ls', 'cp', 'mv', 'rm', 'mb', 'rb', 'sync', 'presign'],
+  s3api: [
+    'list-buckets',
+    'list-objects-v2',
+    'create-bucket',
+    'delete-bucket',
+    'get-object',
+    'put-object',
+  ],
+  lambda: [
+    'list-functions',
+    'get-function',
+    'invoke',
+    'create-function',
+    'delete-function',
+  ],
+  iam: [
+    'list-users',
+    'list-roles',
+    'get-user',
+    'create-user',
+    'delete-user',
+    'list-access-keys',
+  ],
+  rds: [
+    'describe-db-instances',
+    'start-db-instance',
+    'stop-db-instance',
+    'create-db-instance',
+  ],
+  dynamodb: ['list-tables', 'describe-table', 'create-table', 'delete-table', 'scan', 'query'],
+  sts: ['get-caller-identity'],
+  cloudwatch: ['list-metrics', 'get-metric-statistics'],
+  logs: ['describe-log-groups', 'describe-log-streams', 'get-log-events'],
+}
+
+function commonPrefix(items: string[]): string {
+  if (items.length === 0) return ''
+  let prefix = items[0]
+  for (const s of items.slice(1)) {
+    while (!s.startsWith(prefix)) prefix = prefix.slice(0, -1)
+  }
+  return prefix
+}
+
+/** Bash-style completion: returns the new input value and any ambiguous matches. */
+function complete(input: string): { value: string; matches: string[] } {
+  const endsWithSpace = /\s$/.test(input)
+  const trimmed = input.replace(/^\s+/, '')
+  const tokens = trimmed.length ? trimmed.split(/\s+/) : []
+  const editingNew = endsWithSpace || tokens.length === 0
+  const idx = editingNew ? tokens.length : tokens.length - 1
+  const partial = editingNew ? '' : tokens[idx]
+
+  let candidates: string[] = []
+  if (idx === 0) candidates = ['aws']
+  else if (idx === 1) candidates = SERVICES
+  else if (idx === 2) candidates = SUBCOMMANDS[tokens[1]] ?? []
+
+  const matches = candidates.filter((c) => c.startsWith(partial))
+  if (matches.length === 0) return { value: input, matches: [] }
+
+  const base = editingNew ? tokens : tokens.slice(0, -1)
+  if (matches.length === 1) {
+    return { value: [...base, matches[0]].join(' ') + ' ', matches: [] }
+  }
+  const prefix = commonPrefix(matches)
+  const value = prefix.length > partial.length ? [...base, prefix].join(' ') : input
+  return { value, matches }
+}
 
 export function CliPanel() {
   const [lines, setLines] = useState<Line[]>([
@@ -25,6 +133,7 @@ export function CliPanel() {
   const [history, setHistory] = useState<string[]>([])
   const [histIdx, setHistIdx] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
@@ -39,7 +148,7 @@ export function CliPanel() {
     if (!cmd) return
     setHistory((h) => [...h, cmd])
     setHistIdx(null)
-    push({ kind: 'cmd', text: `$ ${cmd}` })
+    push({ kind: 'cmd', text: `➜ ${cmd}` })
 
     if (cmd === 'clear') {
       setLines([])
@@ -78,6 +187,16 @@ export function CliPanel() {
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const { value, matches } = complete(input)
+      if (value !== input) setInput(value)
+      if (matches.length > 1) {
+        push({ kind: 'cmd', text: `➜ ${input}` })
+        push({ kind: 'info', text: matches.join('   ') })
+      }
+      return
+    }
     if (e.key === 'ArrowUp') {
       e.preventDefault()
       if (history.length === 0) return
@@ -99,7 +218,10 @@ export function CliPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-gray-950 font-mono text-xs text-gray-200">
+    <div
+      className="flex h-full flex-col bg-gray-950 font-mono text-xs text-gray-200"
+      onClick={() => inputRef.current?.focus()}
+    >
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2">
         {lines.map((l, i) => (
           <pre
@@ -127,14 +249,19 @@ export function CliPanel() {
         }}
         className="flex items-center gap-2 border-t border-gray-800 px-3 py-1.5"
       >
-        <span className="text-brand-400">$</span>
+        <span className="shrink-0 select-none">
+          <span className="text-green-400">➜</span>{' '}
+          <span className="text-brand-400">~</span>
+        </span>
         <input
+          ref={inputRef}
           autoFocus
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="aws s3 ls"
           spellCheck={false}
+          autoComplete="off"
           disabled={busy}
           className="flex-1 bg-transparent text-gray-100 placeholder-gray-600 focus:outline-none disabled:opacity-60"
         />

@@ -155,14 +155,14 @@ export function Ec2Page() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or ID"
-              className="w-52 rounded-md border border-gray-300 bg-gray-50 py-2 pl-8 pr-2 text-sm focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:focus:bg-gray-950"
+              className="w-52 rounded-md border border-gray-300 bg-white py-2 pl-8 pr-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-950 dark:focus:ring-brand-900/40"
             />
           </div>
           {!needsProfile && (
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as StatusFilter)}
-              className="rounded-md border border-gray-300 bg-gray-50 py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+              className="rounded-md border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-950 dark:focus:ring-brand-900/40"
               title="Filter by status"
             >
               {FILTERS.map((f) => (

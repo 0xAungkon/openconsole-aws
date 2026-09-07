@@ -68,18 +68,25 @@ export function Overview() {
 
   const running = runningQuery.data?.running ?? 0
   const totalInst = runningQuery.data?.total ?? 0
+  const stopped = Math.max(0, totalInst - running)
+
+  // Secondary detail line for each summary card (only when live data is loaded).
+  const computeDetail =
+    enabled && runningQuery.data ? `${running} running · ${stopped} stopped` : undefined
+  const unit = (q: { data?: number; isError: boolean }, noun: string) =>
+    enabled && !q.isError && q.data != null ? noun : undefined
 
   return (
     <div className="grid gap-4 xl:grid-cols-3">
       <div className="flex flex-col gap-4 xl:col-span-2">
         <Card title="Account summary">
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-            <StatCounter label="Compute" value={val(instances)} onClick={() => navigate(`/${profile}/compute`)} />
-            <StatCounter label="Storage" value={val(buckets)} onClick={() => navigate(`/${profile}/storage`)} />
-            <StatCounter label="Functions" value={val(functions)} onClick={() => navigate(`/${profile}/functions`)} />
-            <StatCounter label="Access" value={val(users)} onClick={() => navigate(`/${profile}/access`)} />
-            <StatCounter label="Databases" value={val(dbs)} onClick={() => navigate(`/${profile}/databases`)} />
-            <StatCounter label="NoSQL" value={val(tables)} onClick={() => navigate(`/${profile}/nosql`)} />
+            <StatCounter label="Compute" value={val(instances)} detail={computeDetail} onClick={() => navigate(`/${profile}/compute`)} />
+            <StatCounter label="Storage" value={val(buckets)} detail={unit(buckets, 'buckets')} onClick={() => navigate(`/${profile}/storage`)} />
+            <StatCounter label="Functions" value={val(functions)} detail={unit(functions, 'functions')} onClick={() => navigate(`/${profile}/functions`)} />
+            <StatCounter label="Access" value={val(users)} detail={unit(users, 'users')} onClick={() => navigate(`/${profile}/access`)} />
+            <StatCounter label="Databases" value={val(dbs)} detail={unit(dbs, 'DB instances')} onClick={() => navigate(`/${profile}/databases`)} />
+            <StatCounter label="NoSQL" value={val(tables)} detail={unit(tables, 'tables')} onClick={() => navigate(`/${profile}/nosql`)} />
           </div>
           {!enabled && (
             <p className="mt-2 text-xs text-amber-600">
