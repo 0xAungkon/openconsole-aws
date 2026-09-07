@@ -5,6 +5,7 @@ import { AuthPage } from './pages/AuthPage'
 import { Dashboard } from './pages/Dashboard'
 import { GuestCredentials } from './pages/GuestCredentials'
 import { ModeChooser } from './pages/ModeChooser'
+import { OnboardingPage } from './pages/OnboardingPage'
 import { ProfilesPage } from './pages/ProfilesPage'
 import { ServicePage } from './pages/ServicePage'
 import { useAuthStore } from './store/authStore'
@@ -24,6 +25,15 @@ export default function App() {
       <Route path="/guest" element={<GuestCredentials />} />
       <Route path="/login" element={<AuthPage initialTab="login" />} />
       <Route path="/register" element={<AuthPage initialTab="register" />} />
+
+      <Route
+        path="/onboarding"
+        element={
+          <RequireAuth>
+            <OnboardingPage />
+          </RequireAuth>
+        }
+      />
 
       <Route
         path="/app"

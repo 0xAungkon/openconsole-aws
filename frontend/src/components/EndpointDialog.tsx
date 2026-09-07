@@ -34,9 +34,13 @@ export function EndpointDialog({ onClose }: { onClose: () => void }) {
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            list="endpoint-suggestions"
             placeholder="http://localhost:4566"
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
           />
+          <datalist id="endpoint-suggestions">
+            <option value="http://localhost:4566" />
+          </datalist>
         </label>
         <div className="mt-4 flex justify-end gap-2">
           <button

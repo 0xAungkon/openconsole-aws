@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { listProfiles } from '../api/auth'
 import { EndpointDialog } from '../components/EndpointDialog'
-import { OnboardingModal } from '../components/OnboardingModal'
 import { Sidebar } from '../components/Sidebar'
 import { TopBar } from '../components/TopBar'
 import { getService } from '../services/catalog'
@@ -31,6 +30,9 @@ export function AppLayout() {
   const needsOnboarding =
     mode === 'register' && profiles.isSuccess && profiles.data.length === 0
 
+  // Register users without a profile are sent to the dedicated onboarding page.
+  if (needsOnboarding) return <Navigate to="/onboarding" replace />
+
   return (
     <div className="flex h-full">
       <Sidebar onEndpointClick={() => setEndpointOpen(true)} />
@@ -49,7 +51,6 @@ export function AppLayout() {
       </div>
 
       {endpointOpen && <EndpointDialog onClose={() => setEndpointOpen(false)} />}
-      {needsOnboarding && <OnboardingModal />}
     </div>
   )
 }

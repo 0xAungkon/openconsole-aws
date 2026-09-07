@@ -122,12 +122,16 @@ export function CredentialForm({
               <span className={labelText}>Endpoint URL</span>
               <input
                 className={input}
+                list="endpoint-suggestions"
                 placeholder="Optional — e.g. http://localhost:4566 (Floci/LocalStack)"
                 value={form.endpoint_url}
                 onChange={(e) =>
                   setForm({ ...form, endpoint_url: e.target.value })
                 }
               />
+              <datalist id="endpoint-suggestions">
+                <option value="http://localhost:4566" />
+              </datalist>
             </label>
             <label className="flex flex-col gap-1 text-sm">
               <span className={labelText}>Session token</span>
