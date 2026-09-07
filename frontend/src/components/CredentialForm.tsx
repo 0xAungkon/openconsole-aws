@@ -25,6 +25,8 @@ interface CredentialFormProps {
   /** Show the profile label field (register mode). Guest mode omits it. */
   withLabel?: boolean
   submitLabel: string
+  /** Text shown on the submit button while pending (defaults to "Saving…"). */
+  pendingLabel?: string
   pending?: boolean
   error?: unknown
   onSubmit: (values: CredentialValues) => void
@@ -37,6 +39,7 @@ interface CredentialFormProps {
 export function CredentialForm({
   withLabel = false,
   submitLabel,
+  pendingLabel = 'Saving…',
   pending = false,
   error,
   onSubmit,
@@ -154,7 +157,7 @@ export function CredentialForm({
         disabled={pending}
         className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
       >
-        {pending ? 'Saving…' : submitLabel}
+        {pending ? pendingLabel : submitLabel}
       </button>
     </form>
   )

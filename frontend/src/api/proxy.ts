@@ -56,3 +56,41 @@ export async function runQuery<T = unknown>(
   }
   return data.result as T
 }
+
+export interface TestConnectionInput {
+  access_key_id: string
+  secret_access_key: string
+  session_token?: string
+  region: string
+  endpoint_url?: string
+}
+
+/**
+ * Validate credentials + endpoint before persisting a profile. Uses
+ * sts:GetCallerIdentity, which requires no IAM permissions and works against
+ * LocalStack too. Throws AwsProxyError (code + message) on any failure — e.g. a
+ * bad endpoint URL surfaces as EndpointConnectionError.
+ */
+export async function testConnection(input: TestConnectionInput): Promise<void> {
+  const res = await api.post<ProxyResponse>(
+    '/api/proxy',
+    {
+      service: 'sts',
+      operation: 'get_caller_identity',
+      region: input.region,
+      params: {},
+      endpoint_url: input.endpoint_url || undefined,
+      credentials: {
+        access_key_id: input.access_key_id,
+        secret_access_key: input.secret_access_key,
+        session_token: input.session_token || undefined,
+      },
+    },
+    { validateStatus: () => true },
+  )
+  const data = res.data
+  if (!data || data.ok === false) {
+    if (data?.error) throw new AwsProxyError(data.error)
+    throw new Error(`Connection test failed with status ${res.status}`)
+  }
+}
