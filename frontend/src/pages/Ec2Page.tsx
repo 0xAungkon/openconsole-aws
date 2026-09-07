@@ -139,7 +139,7 @@ export function Ec2Page() {
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div>
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
             Your servers
@@ -155,14 +155,14 @@ export function Ec2Page() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or ID"
-              className="w-52 rounded-md border border-gray-300 py-2 pl-8 pr-2 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+              className="w-52 rounded-md border border-gray-300 bg-gray-50 py-2 pl-8 pr-2 text-sm focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:focus:bg-gray-950"
             />
           </div>
           {!needsProfile && (
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as StatusFilter)}
-              className="rounded-md border border-gray-300 py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+              className="rounded-md border border-gray-300 bg-gray-50 py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
               title="Filter by status"
             >
               {FILTERS.map((f) => (
