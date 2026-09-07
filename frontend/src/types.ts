@@ -70,7 +70,7 @@ export interface ServiceAction {
 export interface ServiceDef {
   key: string // route + boto3 service name, e.g. "ec2"
   label: string
-  icon: string // emoji for a dependency-free icon
+  icon: LucideIcon
   summary: string
   actions: ServiceAction[]
 }
