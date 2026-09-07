@@ -37,3 +37,24 @@ body {
   background-color: #0f1420;
   color: #e5e7eb;
 }
+
+/* Tailwind v4 no longer sets cursor:pointer on interactive elements by default.
+   Restore it for clickable controls, except when disabled. */
+@layer base {
+  button,
+  [role='button'],
+  a,
+  select,
+  summary,
+  label:has(> input[type='checkbox']),
+  label:has(> input[type='radio']) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role='button'][aria-disabled='true'],
+  select:disabled,
+  input:disabled {
+    cursor: default;
+  }
+}

@@ -1,9 +1,13 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { listProfiles } from '../api/auth'
 import { EndpointDialog } from '../components/EndpointDialog'
+import { OnboardingModal } from '../components/OnboardingModal'
 import { Sidebar } from '../components/Sidebar'
 import { TopBar } from '../components/TopBar'
 import { getService } from '../services/catalog'
+import { useAuthStore } from '../store/authStore'
 
 function titleFor(pathname: string): string {
   const parts = pathname.split('/').filter(Boolean) // ['app', ...]
@@ -16,6 +20,16 @@ function titleFor(pathname: string): string {
 export function AppLayout() {
   const location = useLocation()
   const [endpointOpen, setEndpointOpen] = useState(false)
+  const mode = useAuthStore((s) => s.mode)
+
+  // Register-mode onboarding: prompt for a first profile when none exist.
+  const profiles = useQuery({
+    queryKey: ['profiles'],
+    queryFn: listProfiles,
+    enabled: mode === 'register',
+  })
+  const needsOnboarding =
+    mode === 'register' && profiles.isSuccess && profiles.data.length === 0
 
   return (
     <div className="flex h-full">
@@ -35,6 +49,7 @@ export function AppLayout() {
       </div>
 
       {endpointOpen && <EndpointDialog onClose={() => setEndpointOpen(false)} />}
+      {needsOnboarding && <OnboardingModal />}
     </div>
   )
 }
