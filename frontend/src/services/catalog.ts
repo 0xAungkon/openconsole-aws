@@ -7,7 +7,8 @@ import type { Row, ServiceDef } from '../types'
 export const CATALOG: ServiceDef[] = [
   {
     key: 'ec2',
-    label: 'EC2',
+    label: 'Compute',
+    code: 'ec2',
     icon: Server,
     summary: 'Elastic Compute Cloud instances',
     actions: [
@@ -133,7 +134,8 @@ export const CATALOG: ServiceDef[] = [
   },
   {
     key: 's3',
-    label: 'S3',
+    label: 'Storage',
+    code: 's3',
     icon: Boxes,
     summary: 'Simple Storage Service buckets & objects',
     actions: [
@@ -195,7 +197,8 @@ export const CATALOG: ServiceDef[] = [
   },
   {
     key: 'lambda',
-    label: 'Lambda',
+    label: 'Functions',
+    code: 'lambda',
     icon: Zap,
     summary: 'Serverless functions',
     actions: [
@@ -257,7 +260,8 @@ export const CATALOG: ServiceDef[] = [
   },
   {
     key: 'iam',
-    label: 'IAM',
+    label: 'Access',
+    code: 'iam',
     icon: KeyRound,
     summary: 'Identity & Access Management',
     actions: [
@@ -319,7 +323,8 @@ export const CATALOG: ServiceDef[] = [
   },
   {
     key: 'rds',
-    label: 'RDS',
+    label: 'Databases',
+    code: 'rds',
     icon: Database,
     summary: 'Relational Database Service',
     actions: [
@@ -374,7 +379,8 @@ export const CATALOG: ServiceDef[] = [
   },
   {
     key: 'dynamodb',
-    label: 'DynamoDB',
+    label: 'NoSQL',
+    code: 'dynamodb',
     icon: Table2,
     summary: 'NoSQL database tables',
     actions: [

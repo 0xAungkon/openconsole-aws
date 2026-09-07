@@ -20,7 +20,6 @@ export function TopBar({ title }: { title: string }) {
     enabled: mode === 'register',
   })
   const profiles = profilesQuery.data ?? []
-  const current = profiles.find((p) => slugify(p.label) === profileParam)
 
   return (
     <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2.5 dark:border-gray-800 dark:bg-gray-900">

@@ -74,6 +74,8 @@ export interface ServiceAction {
 export interface ServiceDef {
   key: string // route + boto3 service name, e.g. "ec2"
   label: string
+  /** Lowercase service code shown as a badge next to the friendly label. */
+  code: string
   icon: LucideIcon
   summary: string
   actions: ServiceAction[]

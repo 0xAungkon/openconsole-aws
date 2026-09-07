@@ -20,11 +20,18 @@ export function Sidebar() {
   const reset = useAuthStore((s) => s.reset)
 
   const base = `/${profile ?? ''}`
-  const navItems: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
+  const navItems: {
+    to: string
+    label: string
+    code?: string
+    icon: LucideIcon
+    end: boolean
+  }[] = [
     { to: base, label: 'Overview', icon: Home, end: true },
     ...CATALOG.map((s) => ({
       to: `${base}/${s.key}`,
       label: s.label,
+      code: s.code,
       icon: s.icon,
       end: false,
     })),
@@ -79,7 +86,16 @@ export function Sidebar() {
         {navItems.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end} className={linkClass} title={item.label}>
             <item.icon className="h-4 w-4 shrink-0" />
-            {!sidebarCollapsed && <span>{item.label}</span>}
+            {!sidebarCollapsed && (
+              <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <span className="truncate">{item.label}</span>
+                {item.code && (
+                  <span className="shrink-0 rounded bg-gray-100 px-1 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:bg-gray-800 dark:text-gray-500">
+                    {item.code}
+                  </span>
+                )}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
