@@ -48,10 +48,11 @@ export const CATALOG: ServiceDef[] = [
           {
             name: 'ImageId',
             label: 'Image ID (AMI)',
+            suggestions: 'ami',
             type: 'string',
             required: true,
             placeholder: 'ami-0abc1234...',
-            help: 'The AMI to launch. On LocalStack any ami-... value works.',
+            help: 'Search Amazon and your own images, or enter a custom AMI ID. Choose an architecture compatible with your instance type.',
           },
           {
             name: 'InstanceType',

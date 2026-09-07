@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ActionField, ServiceAction } from '../types'
+import { AmiInput } from './AmiInput'
 
 interface ActionFormProps {
   action: ServiceAction
@@ -83,13 +84,21 @@ export function ActionForm({ action, running, onRun }: ActionFormProps) {
         </p>
       )}
       {action.fields.map((f) => (
-        <label key={f.name} className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-gray-700 dark:text-gray-200">
+        <div key={f.name} className="flex flex-col gap-1 text-sm">
+          <label htmlFor={`field-${f.name}`} className="font-medium text-gray-700 dark:text-gray-200">
             {f.label}
             {f.required && <span className="text-red-500"> *</span>}
-          </span>
-          {f.type === 'json' ? (
+          </label>
+          {f.suggestions === 'ami' ? (
+            <AmiInput
+              id={`field-${f.name}`}
+              value={values[f.name] ?? ''}
+              required={f.required}
+              onChange={(value) => setValues((v) => ({ ...v, [f.name]: value }))}
+            />
+          ) : f.type === 'json' ? (
             <textarea
+              id={`field-${f.name}`}
               value={values[f.name] ?? ''}
               placeholder={f.placeholder}
               onChange={(e) =>
@@ -100,6 +109,7 @@ export function ActionForm({ action, running, onRun }: ActionFormProps) {
             />
           ) : (
             <input
+              id={`field-${f.name}`}
               value={values[f.name] ?? ''}
               placeholder={f.placeholder}
               onChange={(e) =>
@@ -109,7 +119,7 @@ export function ActionForm({ action, running, onRun }: ActionFormProps) {
             />
           )}
           {f.help && <span className="text-xs text-gray-400">{f.help}</span>}
-        </label>
+        </div>
       ))}
       {jsonError && <p className="text-sm text-red-600">{jsonError}</p>}
       <div>

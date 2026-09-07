@@ -50,6 +50,7 @@ export interface ActionField {
   help?: string
   /** Prefilled value for the input (e.g. a sensible default instance type). */
   default?: string
+  suggestions?: 'ami'
 }
 
 export interface Column {
