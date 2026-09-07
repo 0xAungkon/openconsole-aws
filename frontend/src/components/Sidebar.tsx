@@ -61,9 +61,10 @@ export function Sidebar() {
           <div className="flex items-center gap-2">
             <Hexagon className="h-5 w-5 shrink-0 text-brand-500" />
             <span className="text-sm font-semibold leading-tight text-gray-800 dark:text-gray-100">
-              {BRAND_BADGE}
-              <br />
               {BRAND_NAME}
+              <sup className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide text-brand-500">
+                {BRAND_BADGE}
+              </sup>
             </span>
           </div>
         )}
