@@ -59,10 +59,10 @@ export function Sidebar() {
       <div className="flex items-center justify-between px-3 py-4">
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-brand-500 px-1.5 py-0.5 text-xs font-bold text-white">
+            <Hexagon className="h-5 w-5 shrink-0 text-brand-500" />
+            <span className="text-sm font-semibold leading-tight text-gray-800 dark:text-gray-100">
               {BRAND_BADGE}
-            </span>
-            <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+              <br />
               {BRAND_NAME}
             </span>
           </div>
