@@ -1,1 +1,0 @@
-# openconsole-aws
