@@ -7,7 +7,7 @@ from app.database import Base
 class HistoryEntry(Base):
     __tablename__ = "history_entries"
     __table_args__ = (
-        UniqueConstraint("user_id", "entry_id"),
+        UniqueConstraint("user_id", "kind", "entry_id"),
         Index("ix_history_owner_kind", "user_id", "kind", "id"),
     )
 

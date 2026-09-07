@@ -9,3 +9,11 @@ export function appendHistory(kind: HistoryKind, payloads: object[]) {
   listener({ kind, entries: payloads.map((payload) => ({ id: crypto.randomUUID(), payload })) })
 }
 export function clearHistory(kind: HistoryKind) { listener({ kind }) }
+
+let generation = 0
+export function changeHistorySession() { generation++ }
+/** Ignore output from requests started in a previous login/guest session. */
+export function scopedHistoryAction<T extends unknown[]>(action: (...args: T) => void) {
+  const origin = generation
+  return (...args: T) => { if (origin === generation) action(...args) }
+}

@@ -24,6 +24,20 @@ Register mode: Browser (JWT + profile_id) ──────query─────
 - **Register mode** — create an account, store AWS profiles that are **encrypted
   at rest** (Fernet) and resolved server-side via a JWT + profile id.
 
+## Inspector and terminal history
+
+Guest Inspector logs, terminal output, and command history stay in browser
+localStorage. Signed-in history is stored per account in SQLite and restored
+on login, including in another browser. Open sessions refresh every 10 seconds
+and when the window regains focus. Guest history is never uploaded to an account.
+
+History retains the latest 200 Inspector entries, 500 terminal lines, and 200
+commands. Clearing the terminal removes output but keeps command recall;
+clearing the Inspector removes its entries. For signed-in users, clears apply
+to the account across browsers. Logout waits for pending history saves; storage
+failures are shown in the panels and retried while the page remains open.
+Run `uv run alembic upgrade head` in `backend/` when upgrading an existing install.
+
 ## Layout
 
 - `backend/` — FastAPI app (`app/routes`, `app/models`, `app/schemas`,
@@ -58,6 +72,8 @@ uv run pytest               # run the test suite
 cd frontend
 npm install
 npm run dev                 # serves on http://localhost:5173 (proxies /api -> :8000)
+npm run build               # typecheck and production build
+node tests/run-history.mjs  # history persistence and session isolation checks
 ```
 
 Open http://localhost:5173.

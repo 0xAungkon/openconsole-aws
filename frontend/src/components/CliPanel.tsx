@@ -1,3 +1,5 @@
+import { HistorySyncStatus } from './HistorySyncStatus'
+import { scopedHistoryAction } from '../store/historyEvents'
 import { Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { runCli } from '../api/cli'
@@ -161,21 +163,22 @@ export function CliPanel() {
       return
     }
 
+    const pushOutput = scopedHistoryAction(push)
     setBusy(true)
     try {
       const res = await runCli(cmd)
       const out = res.stdout.replace(/\n+$/, '')
       const err = res.stderr.replace(/\n+$/, '')
-      if (out) push({ kind: 'out', text: out })
-      if (err) push({ kind: res.ok ? 'info' : 'err', text: err })
+      if (out) pushOutput({ kind: 'out', text: out })
+      if (err) pushOutput({ kind: res.ok ? 'info' : 'err', text: err })
       if (!out && !err) {
-        push({
+        pushOutput({
           kind: 'info',
           text: res.ok ? '(no output)' : `exited with code ${res.exit_code}`,
         })
       }
     } catch (err) {
-      push({ kind: 'err', text: err instanceof Error ? err.message : String(err) })
+      pushOutput({ kind: 'err', text: err instanceof Error ? err.message : String(err) })
     } finally {
       setBusy(false)
     }
@@ -231,6 +234,7 @@ export function CliPanel() {
           Clear
         </button>
       </div>
+      <HistorySyncStatus />
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2">
         {lines.map((l, i) => (
           <pre

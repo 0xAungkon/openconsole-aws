@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/authStore'
+import { scopedHistoryAction } from '../store/historyEvents'
 import { useLogStore } from '../store/logStore'
 import { useSessionStore } from '../store/sessionStore'
 import { api } from './client'
@@ -38,6 +39,7 @@ export async function runCli(command: string): Promise<CliResult> {
     if (endpointUrl) body.endpoint_url = endpointUrl
   }
 
+  const addLog = scopedHistoryAction(useLogStore.getState().add)
   const started = performance.now()
   const res = await api.post<CliResult>('/api/cli', body, {
     validateStatus: () => true,
@@ -52,7 +54,7 @@ export async function runCli(command: string): Promise<CliResult> {
     command,
   }
 
-  useLogStore.getState().add({
+  addLog({
     source: 'cli',
     command: data.command || command,
     status: data.ok ? 'ok' : 'error',

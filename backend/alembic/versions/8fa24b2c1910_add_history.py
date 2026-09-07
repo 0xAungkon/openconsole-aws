@@ -20,7 +20,7 @@ def upgrade():
         sa.Column("entry_id", sa.String(36), nullable=False),
         sa.Column("kind", sa.String(16), nullable=False),
         sa.Column("payload", sa.JSON(), nullable=False),
-        sa.UniqueConstraint("user_id", "entry_id"),
+        sa.UniqueConstraint("user_id", "kind", "entry_id"),
     )
     op.create_index("ix_history_owner_kind", "history_entries", ["user_id", "kind", "id"])
 

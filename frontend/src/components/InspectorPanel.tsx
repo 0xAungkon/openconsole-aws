@@ -1,3 +1,4 @@
+import { HistorySyncStatus } from './HistorySyncStatus'
 import { Check, Copy, Download } from 'lucide-react'
 import { useState } from 'react'
 import type { LogEntry } from '../store/logStore'
@@ -136,6 +137,7 @@ export function InspectorPanel() {
         </div>
       </div>
 
+      <HistorySyncStatus />
       <div className="flex-1 overflow-y-auto">
         {entries.length === 0 ? (
           <p className="p-4 text-center text-gray-400">

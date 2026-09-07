@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { useAuthStore } from './authStore'
 import { useCliStore, WELCOME_LINE, type CliLine } from './cliStore'
 import { useLogStore, type LogEntry } from './logStore'
-import { onHistoryChange, type HistoryChange } from './historyEvents'
+import { changeHistorySession, onHistoryChange, type HistoryChange } from './historyEvents'
 
 interface Snapshot {
   inspector: LogEntry[]
@@ -20,7 +20,7 @@ interface Account {
 export const useHistorySync = create<{ status: string }>(() => ({ status: '' }))
 const guestKey = 'aws-openconsole-guest-history'
 // A dedicated client pins each request to its originating account, even after logout.
-const client = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000' })
+let client = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000', timeout: 15_000 })
 let account: Account | null = null
 let started = false
 
@@ -81,6 +81,7 @@ async function drain(session: Account) {
 }
 
 function switchSession() {
+  changeHistorySession()
   const auth = useAuthStore.getState()
   account = null
   useHistorySync.setState({ status: '' })
@@ -104,9 +105,10 @@ function switchSession() {
   }
 }
 
-export function startHistorySync() {
+export function startHistorySync(historyClient = client) {
   if (started) return
   started = true
+  client = historyClient
   onHistoryChange((change) => {
     if (account) {
       account.queue.push(change)
@@ -138,4 +140,17 @@ export function startHistorySync() {
   window.addEventListener('beforeunload', (event) => {
     if (account?.queue.length) event.preventDefault()
   })
+}
+
+/** Let explicit logout finish saving before discarding the session. */
+export async function flushHistory(): Promise<boolean> {
+  const session = account
+  if (!session) return true
+  while (session.saving) await new Promise((resolve) => setTimeout(resolve, 50))
+  if (session.queue.length) await drain(session)
+  if (session.queue.length) {
+    status(session, 'History could not be saved. Please reconnect before logging out.')
+    return false
+  }
+  return true
 }

@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { flushHistory } from '../store/historySync'
 import {
   Hexagon,
   Home,
@@ -17,6 +19,7 @@ export function Sidebar() {
   const { profile } = useParams()
   const navigate = useNavigate()
   const { sidebarCollapsed, toggleSidebar } = useSessionStore()
+  const [loggingOut, setLoggingOut] = useState(false)
   const reset = useAuthStore((s) => s.reset)
 
   const base = `/${profile ?? ''}`
@@ -45,9 +48,13 @@ export function Sidebar() {
         : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
     }`
 
-  function logout() {
-    reset()
-    navigate('/')
+  async function logout() {
+    setLoggingOut(true)
+    if (await flushHistory()) {
+      reset()
+      navigate('/')
+    }
+    setLoggingOut(false)
   }
 
   return (
@@ -109,6 +116,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={logout}
+          disabled={loggingOut}
           className={`${linkBase} w-full text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800`}
           title="Log out"
         >

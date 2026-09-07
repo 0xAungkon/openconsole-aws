@@ -1,6 +1,7 @@
 import type { ProxyError, ProxyResponse } from '../types'
 import { toAwsCliCommand } from '../lib/awscli'
 import { useAuthStore } from '../store/authStore'
+import { scopedHistoryAction } from '../store/historyEvents'
 import { useLogStore } from '../store/logStore'
 import { useSessionStore } from '../store/sessionStore'
 import { api } from './client'
@@ -47,6 +48,7 @@ export async function runQuery<T = unknown>(
 
   // The proxy returns 200 for success and 4xx/5xx for AWS/validation errors,
   // both carrying a ProxyResponse body. Read the body regardless of status.
+  const addLog = scopedHistoryAction(useLogStore.getState().add)
   const started = performance.now()
   const res = await api.post<ProxyResponse<T>>('/api/proxy', body, {
     validateStatus: () => true,
@@ -64,7 +66,7 @@ export async function runQuery<T = unknown>(
       code: 'RequestError',
       message: `Request failed with status ${res.status}`,
     }
-    useLogStore.getState().add({
+    addLog({
       source: 'gui',
       command,
       service,
@@ -77,7 +79,7 @@ export async function runQuery<T = unknown>(
     throw new AwsProxyError(error)
   }
 
-  useLogStore.getState().add({
+  addLog({
     source: 'gui',
     command,
     service,
