@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ActionField, ServiceAction } from '../types'
 import { AmiInput } from './AmiInput'
+import { InstanceTypeInput } from './InstanceTypeInput'
 
 interface ActionFormProps {
   action: ServiceAction
@@ -91,6 +92,13 @@ export function ActionForm({ action, running, onRun }: ActionFormProps) {
           </label>
           {f.suggestions === 'ami' ? (
             <AmiInput
+              id={`field-${f.name}`}
+              value={values[f.name] ?? ''}
+              required={f.required}
+              onChange={(value) => setValues((v) => ({ ...v, [f.name]: value }))}
+            />
+          ) : f.suggestions === 'instance-type' ? (
+            <InstanceTypeInput
               id={`field-${f.name}`}
               value={values[f.name] ?? ''}
               required={f.required}

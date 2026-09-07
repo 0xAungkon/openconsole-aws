@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { runQuery } from '../api/proxy'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
@@ -10,6 +10,18 @@ interface Ami {
   Name?: string
   Architecture?: string
   CreationDate?: string
+  Description?: string
+  Tags?: { Key?: string; Value?: string }[]
+}
+
+function imageName(ami: Ami): string {
+  return ami.Tags?.find((tag) => tag.Key === 'Name')?.Value || ami.Name || 'Unnamed image'
+}
+
+function architectureLabel(architecture?: string): string {
+  if (architecture === 'x86_64') return '64-bit Intel / AMD'
+  if (architecture === 'arm64') return '64-bit ARM'
+  return architecture || 'Architecture not provided'
 }
 
 interface ImagePage {
@@ -34,6 +46,9 @@ export function AmiInput({ id, value, required, onChange }: {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState(value.trim())
   const [active, setActive] = useState(-1)
+  // Retain the name when selecting an ID changes the search results.
+  const [selection, setSelection] = useState<{ image: Ami; scope: string } | null>(null)
+  const scope = JSON.stringify([mode, userId, profileId, guest?.accessKeyId, region, endpoint])
   const input = useRef<HTMLInputElement>(null)
   const ready = mode === 'guest' ? !!guest : mode === 'register' && profileId != null
 
@@ -68,8 +83,13 @@ export function AmiInput({ id, value, required, onChange }: {
     : []
   const custom = value.trim()
   const optionCount = options.length + (custom ? 1 : 0)
+  const selectedImage = selection?.scope === scope && selection.image.ImageId === value.trim()
+    ? selection.image
+    : options.find((ami) => ami.ImageId === value.trim())
 
   function choose(next: string) {
+    const image = options.find((ami) => ami.ImageId === next) ?? (selectedImage?.ImageId === next ? selectedImage : undefined)
+    setSelection(image ? { image, scope } : null)
     onChange(next)
     setOpen(false)
     setActive(-1)
@@ -83,6 +103,17 @@ export function AmiInput({ id, value, required, onChange }: {
     <div className="relative" onBlur={(e) => {
       if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false)
     }}>
+      {selectedImage && (
+        <div id={`${id}-selection`} className="mb-2 rounded-md border border-brand-200 bg-brand-50 px-3 py-2.5 dark:border-brand-800 dark:bg-brand-900/20">
+          <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-brand-700 dark:text-brand-200">
+            <Check aria-hidden="true" className="h-3.5 w-3.5" /> Selected image
+          </div>
+          <div className="break-words text-sm font-semibold text-gray-900 dark:text-gray-100">{imageName(selectedImage)}</div>
+          <div className="mt-1 break-all font-mono text-xs text-gray-600 dark:text-gray-300">{selectedImage.ImageId}</div>
+          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{architectureLabel(selectedImage.Architecture)}</div>
+          {selectedImage.Description && <p className="mt-2 break-words text-xs text-gray-600 dark:text-gray-300">{selectedImage.Description}</p>}
+        </div>
+      )}
       <div className="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1.5 focus-within:border-brand-500 dark:border-gray-700 dark:bg-gray-950">
         <input
           ref={input}
@@ -92,14 +123,14 @@ export function AmiInput({ id, value, required, onChange }: {
           aria-controls={`${id}-options`}
           aria-autocomplete="list"
           aria-activedescendant={open && active >= 0 && active < optionCount ? `${id}-option-${active}` : undefined}
-          aria-describedby={open ? `${id}-status` : undefined}
+          aria-describedby={[selectedImage ? `${id}-selection` : '', open ? `${id}-status` : ''].filter(Boolean).join(' ') || undefined}
           required={required}
           value={value}
           autoComplete="off"
-          placeholder="Search images or enter an AMI ID"
+          placeholder="Search by image name or paste an ID"
           onFocus={() => setOpen(true)}
           onClick={() => setOpen(true)}
-          onChange={(e) => { onChange(e.target.value); setActive(-1); setOpen(true) }}
+          onChange={(e) => { onChange(e.target.value); setSelection(null); setActive(-1); setOpen(true) }}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault()
@@ -117,6 +148,7 @@ export function AmiInput({ id, value, required, onChange }: {
         />
         {value && <button type="button" aria-label="Clear image ID" onClick={() => {
           onChange('')
+          setSelection(null)
           setActive(-1)
           setOpen(true)
           input.current?.focus()
@@ -130,8 +162,10 @@ export function AmiInput({ id, value, required, onChange }: {
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => choose(ami.ImageId)}
                 className={`cursor-pointer px-3 py-2 text-xs hover:bg-brand-50 dark:hover:bg-gray-800 ${active === index ? 'bg-brand-50 dark:bg-gray-800' : ''}`}>
-                <div className="break-words font-medium">{ami.Name || ami.ImageId}</div>
-                <div className="mt-1 text-gray-500">{ami.ImageId} · {ami.Architecture || 'Unknown architecture'}</div>
+                <div className="break-words text-sm font-medium text-gray-900 dark:text-gray-100">{imageName(ami)}</div>
+                <div className="mt-1 break-all font-mono text-gray-500 dark:text-gray-400">{ami.ImageId}</div>
+                <div className="mt-1 text-gray-500 dark:text-gray-400">{architectureLabel(ami.Architecture)}</div>
+                {ami.Description && <div className="mt-1 line-clamp-2 break-words text-gray-500 dark:text-gray-400">{ami.Description}</div>}
               </div>
             ))}
             {custom && <div id={`${id}-option-${options.length}`} role="option" aria-selected={active === options.length}

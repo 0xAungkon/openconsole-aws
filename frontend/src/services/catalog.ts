@@ -47,16 +47,18 @@ export const CATALOG: ServiceDef[] = [
         fields: [
           {
             name: 'ImageId',
-            label: 'Image ID (AMI)',
+            label: 'Server image (operating system)',
             suggestions: 'ami',
             type: 'string',
             required: true,
             placeholder: 'ami-0abc1234...',
-            help: 'Search Amazon and your own images, or enter a custom AMI ID. Choose an architecture compatible with your instance type.',
+            help: 'An image provides the operating system and preinstalled software for your server. Choose an image above, or paste your own image ID.',
           },
           {
             name: 'InstanceType',
-            label: 'Instance type',
+            label: 'Server size (instance type)',
+            suggestions: 'instance-type',
+            help: 'Compare processing power and memory. The processor architecture must match your selected image.',
             type: 'string',
             required: true,
             default: 't2.micro',
