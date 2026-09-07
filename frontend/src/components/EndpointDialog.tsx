@@ -27,12 +27,17 @@ export function EndpointDialog({ onClose }: { onClose: () => void }) {
           Point requests at a local Floci / LocalStack endpoint. Leave blank to
           use the default AWS endpoint for the selected region.
         </p>
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="http://localhost:4566"
-          className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
-        />
+        <label className="mt-3 flex flex-col gap-1 text-sm">
+          <span className="font-medium text-gray-700 dark:text-gray-200">
+            Endpoint URL
+          </span>
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="http://localhost:4566"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+          />
+        </label>
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
