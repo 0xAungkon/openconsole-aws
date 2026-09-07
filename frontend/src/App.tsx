@@ -47,8 +47,8 @@ export default function App() {
       >
         <Route index element={<Overview />} />
         <Route path="settings" element={<SettingsPage />} />
-        <Route path="ec2" element={<Ec2Page />} />
-        <Route path="ec2/:instanceId" element={<Ec2InstancePage />} />
+        <Route path="compute" element={<Ec2Page />} />
+        <Route path="compute/:instanceId" element={<Ec2InstancePage />} />
         <Route path=":service" element={<ServicePage />} />
       </Route>
 

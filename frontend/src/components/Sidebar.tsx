@@ -29,7 +29,7 @@ export function Sidebar() {
   }[] = [
     { to: base, label: 'Overview', icon: Home, end: true },
     ...CATALOG.map((s) => ({
-      to: `${base}/${s.key}`,
+      to: `${base}/${s.route}`,
       label: s.label,
       code: s.code,
       icon: s.icon,

@@ -62,7 +62,7 @@ export function Ec2InstancePage() {
   const queryClient = useQueryClient()
 
   const needsProfile = mode === 'register' && activeProfileId == null
-  const backTo = `/${profile}/ec2`
+  const backTo = `/${profile}/compute`
 
   const query = useQuery({
     queryKey: ['ec2-instance', instanceId, region, activeProfileId],

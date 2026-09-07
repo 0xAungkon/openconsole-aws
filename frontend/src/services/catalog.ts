@@ -7,6 +7,7 @@ import type { Row, ServiceDef } from '../types'
 export const CATALOG: ServiceDef[] = [
   {
     key: 'ec2',
+    route: 'compute',
     label: 'Compute',
     code: 'ec2',
     icon: Server,
@@ -134,6 +135,7 @@ export const CATALOG: ServiceDef[] = [
   },
   {
     key: 's3',
+    route: 'storage',
     label: 'Storage',
     code: 's3',
     icon: Boxes,
@@ -197,6 +199,7 @@ export const CATALOG: ServiceDef[] = [
   },
   {
     key: 'lambda',
+    route: 'functions',
     label: 'Functions',
     code: 'lambda',
     icon: Zap,
@@ -260,6 +263,7 @@ export const CATALOG: ServiceDef[] = [
   },
   {
     key: 'iam',
+    route: 'access',
     label: 'Access',
     code: 'iam',
     icon: KeyRound,
@@ -323,6 +327,7 @@ export const CATALOG: ServiceDef[] = [
   },
   {
     key: 'rds',
+    route: 'databases',
     label: 'Databases',
     code: 'rds',
     icon: Database,
@@ -379,6 +384,7 @@ export const CATALOG: ServiceDef[] = [
   },
   {
     key: 'dynamodb',
+    route: 'nosql',
     label: 'NoSQL',
     code: 'dynamodb',
     icon: Table2,
@@ -415,4 +421,9 @@ export const CATALOG: ServiceDef[] = [
 
 export function getService(key: string | undefined): ServiceDef | undefined {
   return CATALOG.find((s) => s.key === key)
+}
+
+/** Look up a service by its non-technical URL slug, e.g. "compute". */
+export function getServiceByRoute(route: string | undefined): ServiceDef | undefined {
+  return CATALOG.find((s) => s.route === route)
 }

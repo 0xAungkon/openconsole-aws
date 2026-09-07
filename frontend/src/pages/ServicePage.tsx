@@ -6,13 +6,13 @@ import { ActionForm } from '../components/ActionForm'
 import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
 import { ErrorAlert } from '../components/ErrorAlert'
-import { getService } from '../services/catalog'
+import { getServiceByRoute } from '../services/catalog'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
 export function ServicePage() {
   const { service } = useParams()
-  const def = getService(service)
+  const def = getServiceByRoute(service)
   const [actionId, setActionId] = useState(def?.actions[0]?.id ?? '')
 
   const mode = useAuthStore((s) => s.mode)

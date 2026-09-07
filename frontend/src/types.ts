@@ -72,7 +72,9 @@ export interface ServiceAction {
 }
 
 export interface ServiceDef {
-  key: string // route + boto3 service name, e.g. "ec2"
+  key: string // boto3 service name, e.g. "ec2"
+  /** Non-technical URL slug for the service, e.g. "compute". */
+  route: string
   label: string
   /** Lowercase service code shown as a badge next to the friendly label. */
   code: string

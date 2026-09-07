@@ -5,7 +5,7 @@ import { listProfiles } from '../api/auth'
 import { BottomDock } from '../components/BottomDock'
 import { Sidebar } from '../components/Sidebar'
 import { TopBar } from '../components/TopBar'
-import { getService } from '../services/catalog'
+import { getServiceByRoute } from '../services/catalog'
 import { findProfileBySlug } from '../lib/slug'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
@@ -16,7 +16,7 @@ function titleFor(pathname: string): string {
   const seg = pathname.split('/').filter(Boolean)[1] // ['<profile>', <seg>]
   if (!seg) return 'Overview'
   if (seg === 'settings') return 'Settings'
-  return getService(seg)?.label ?? seg
+  return getServiceByRoute(seg)?.label ?? seg
 }
 
 export function AppLayout() {

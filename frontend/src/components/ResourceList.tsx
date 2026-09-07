@@ -20,7 +20,7 @@ export function ResourceList() {
           </div>
           <button
             type="button"
-            onClick={() => navigate(`/${profile}/${s.key}`)}
+            onClick={() => navigate(`/${profile}/${s.route}`)}
             className="rounded-md border border-brand-200 px-3 py-1 text-xs font-medium text-brand-600 transition hover:bg-brand-50 dark:border-gray-700 dark:text-brand-300 dark:hover:bg-gray-800"
           >
             Open

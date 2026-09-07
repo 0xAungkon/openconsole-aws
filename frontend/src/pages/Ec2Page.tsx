@@ -233,7 +233,7 @@ export function Ec2Page() {
                     key={r.InstanceId}
                     row={r}
                     busy={pendingId === r.InstanceId}
-                    onOpen={() => navigate(`/${profile}/ec2/${r.InstanceId}`)}
+                    onOpen={() => navigate(`/${profile}/compute/${r.InstanceId}`)}
                     onAct={act}
                   />
                 ))}

@@ -74,12 +74,12 @@ export function Overview() {
       <div className="flex flex-col gap-4 xl:col-span-2">
         <Card title="Account summary">
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-            <StatCounter label="EC2" value={val(instances)} onClick={() => navigate(`/${profile}/ec2`)} />
-            <StatCounter label="S3" value={val(buckets)} onClick={() => navigate(`/${profile}/s3`)} />
-            <StatCounter label="Lambda" value={val(functions)} onClick={() => navigate(`/${profile}/lambda`)} />
-            <StatCounter label="IAM" value={val(users)} onClick={() => navigate(`/${profile}/iam`)} />
-            <StatCounter label="RDS" value={val(dbs)} onClick={() => navigate(`/${profile}/rds`)} />
-            <StatCounter label="DynamoDB" value={val(tables)} onClick={() => navigate(`/${profile}/dynamodb`)} />
+            <StatCounter label="Compute" value={val(instances)} onClick={() => navigate(`/${profile}/compute`)} />
+            <StatCounter label="Storage" value={val(buckets)} onClick={() => navigate(`/${profile}/storage`)} />
+            <StatCounter label="Functions" value={val(functions)} onClick={() => navigate(`/${profile}/functions`)} />
+            <StatCounter label="Access" value={val(users)} onClick={() => navigate(`/${profile}/access`)} />
+            <StatCounter label="Databases" value={val(dbs)} onClick={() => navigate(`/${profile}/databases`)} />
+            <StatCounter label="NoSQL" value={val(tables)} onClick={() => navigate(`/${profile}/nosql`)} />
           </div>
           {!enabled && (
             <p className="mt-2 text-xs text-amber-600">
