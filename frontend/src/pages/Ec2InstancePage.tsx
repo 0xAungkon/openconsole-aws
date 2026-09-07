@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   Camera,
+  Cpu,
   HardDrive,
   Play,
   Plus,
@@ -19,22 +20,11 @@ import { runQuery } from '../api/proxy'
 import { Card } from '../components/Card'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { StateBadge } from '../components/StateBadge'
+import { InstanceTypeInput } from '../components/InstanceTypeInput'
+import { ImageHardwareCard, InstanceHealthCard, InstanceFirewallRulesCard } from '../components/InstanceDetailsCards'
 import { flattenInstances, timeAgo, type InstanceRow } from '../lib/ec2'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
-
-const INSTANCE_SIZES = [
-  't2.micro',
-  't2.small',
-  't2.medium',
-  't3.micro',
-  't3.small',
-  't3.medium',
-  't3.large',
-  'm5.large',
-  'm5.xlarge',
-  'c5.large',
-]
 
 /** Shared mutation that runs an EC2 operation and refreshes instance/list/volume data. */
 function useEc2Mutation() {
@@ -47,6 +37,8 @@ function useEc2Mutation() {
       queryClient.invalidateQueries({ queryKey: ['ec2-instances'] })
       queryClient.invalidateQueries({ queryKey: ['ec2-volumes'] })
       queryClient.invalidateQueries({ queryKey: ['ec2-security-groups'] })
+      queryClient.invalidateQueries({ queryKey: ['ec2-detail-health'] })
+      queryClient.invalidateQueries({ queryKey: ['ec2-detail-rules'] })
     },
   })
 }
@@ -74,6 +66,9 @@ export function Ec2InstancePage() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['ec2-instance', instanceId] })
     queryClient.invalidateQueries({ queryKey: ['ec2-instances'] })
+    for (const key of ['ec2-detail-image', 'ec2-detail-hardware', 'ec2-detail-health', 'ec2-detail-rules', 'ec2-volumes', 'ec2-security-groups']) {
+      queryClient.invalidateQueries({ queryKey: [key] })
+    }
   }
 
   const power = useEc2Mutation()
@@ -87,11 +82,11 @@ export function Ec2InstancePage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
       <button
         type="button"
         onClick={() => navigate(backTo)}
-        className="inline-flex w-fit items-center gap-1.5 text-sm text-gray-500 transition hover:text-brand-600"
+        className="inline-flex w-fit items-center gap-1.5 rounded-md text-sm text-gray-500 transition hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500 dark:text-gray-400"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to servers
@@ -116,10 +111,18 @@ export function Ec2InstancePage() {
       ) : (
         <>
           {/* Header */}
-          <div className="flex flex-wrap items-center gap-3">
-            <NameEditor row={row} instanceId={instanceId!} />
+          <div className="flex flex-wrap items-center gap-5 rounded-xl border border-gray-200 bg-white p-5 shadow-xs sm:p-6 dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
+                <Cpu aria-hidden="true" className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <NameEditor row={row} instanceId={instanceId!} />
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{row.InstanceType} <span className="px-1 text-gray-300 dark:text-gray-600">/</span> {row.AZ || region}</p>
+              </div>
+            </div>
 
-            <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 border-t border-gray-100 pt-4 xl:ml-auto xl:w-auto xl:border-0 xl:pt-0 dark:border-gray-800">
               <button
                 type="button"
                 onClick={refresh}
@@ -162,7 +165,7 @@ export function Ec2InstancePage() {
 
           {power.isError && <ErrorAlert error={power.error} />}
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid items-start gap-5 lg:grid-cols-2">
             <Card title="Overview">
               <dl className="divide-y divide-gray-100 dark:divide-gray-800">
                 <Detail label="Status" value={<StateBadge state={row.State} />} />
@@ -184,12 +187,15 @@ export function Ec2InstancePage() {
               </dl>
             </Card>
 
+            <ImageHardwareCard row={row} />
+            <InstanceHealthCard row={row} />
             <ConfigCard row={row} instanceId={instanceId!} />
             <FirewallCard row={row} instanceId={instanceId!} />
             <TagsCard row={row} instanceId={instanceId!} />
             <BackupCard instanceId={instanceId!} />
           </div>
 
+          <InstanceFirewallRulesCard row={row} />
           <VolumesCard instanceId={instanceId!} />
         </>
       )}
@@ -276,9 +282,6 @@ function ConfigCard({ row, instanceId }: { row: InstanceRow; instanceId: string 
   useEffect(() => setSize(row.InstanceType), [row.InstanceType])
 
   const stopped = row.State === 'stopped'
-  const sizes = INSTANCE_SIZES.includes(row.InstanceType)
-    ? INSTANCE_SIZES
-    : [row.InstanceType, ...INSTANCE_SIZES]
   const monitoringOn = row.Monitoring === 'enabled' || row.Monitoring === 'pending'
 
   return (
@@ -286,31 +289,22 @@ function ConfigCard({ row, instanceId }: { row: InstanceRow; instanceId: string 
       <div className="flex flex-col gap-4">
         {/* Resize */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
+          <label htmlFor="resize-instance-type" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
             Server size
           </label>
           <div className="flex items-center gap-2">
-            <select
-              value={size}
-              onChange={(e) => setSize(e.target.value)}
-              disabled={!stopped}
-              className="flex-1 rounded-md border border-gray-300 px-2 py-2 text-sm focus:border-brand-500 focus:outline-none disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950"
-            >
-              {sizes.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+            <div className="min-w-0 flex-1">
+              {stopped ? <InstanceTypeInput id="resize-instance-type" value={size} required onChange={setSize} /> : <input id="resize-instance-type" disabled value={row.InstanceType} className="w-full rounded-md border border-gray-300 px-2 py-2 text-sm opacity-60 dark:border-gray-700 dark:bg-gray-950" />}
+            </div>
             <button
               type="button"
               onClick={() =>
                 resize.mutate({
                   op: 'modify_instance_attribute',
-                  params: { InstanceId: instanceId, InstanceType: { Value: size } },
+                  params: { InstanceId: instanceId, InstanceType: { Value: size.trim() } },
                 })
               }
-              disabled={!stopped || resize.isPending || size === row.InstanceType}
+              disabled={!stopped || resize.isPending || !size.trim() || size.trim() === row.InstanceType}
               className="rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-40"
             >
               {resize.isPending ? 'Applying…' : 'Apply'}

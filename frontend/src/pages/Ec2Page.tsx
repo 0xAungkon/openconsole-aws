@@ -137,32 +137,36 @@ export function Ec2Page() {
   ]
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+      <div className="flex flex-wrap items-center gap-5 border-b border-gray-200 pb-5 dark:border-gray-800">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300"><Cpu aria-hidden="true" className="h-5 w-5" /></div>
+          <div>
+          <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
             Your servers
           </h1>
-          <p className="text-xs text-gray-400">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Virtual machines running in {region}
           </p>
+          </div>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div className="relative">
+        <div className="flex w-full flex-wrap items-center gap-2 xl:ml-auto xl:w-auto">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or ID"
-              className="w-52 rounded-md border border-gray-300 bg-white py-2 pl-8 pr-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-950 dark:focus:ring-brand-900/40"
+              aria-label="Search servers by name or ID"
+              className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-8 pr-3 text-sm transition placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:w-64 dark:border-gray-700 dark:bg-gray-900 dark:focus:ring-brand-900/40"
             />
           </div>
           {!needsProfile && (
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as StatusFilter)}
-              className="rounded-md border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-950 dark:focus:ring-brand-900/40"
+              className="rounded-lg border border-gray-200 bg-white py-2.5 pl-3 pr-8 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-900 dark:focus:ring-brand-900/40"
               title="Filter by status"
             >
               {FILTERS.map((f) => (

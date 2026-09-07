@@ -1,9 +1,10 @@
 import { HistorySyncStatus } from './HistorySyncStatus'
 import { scopedHistoryAction } from '../store/historyEvents'
-import { Trash2 } from 'lucide-react'
+import { Download, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { runCli } from '../api/cli'
 import { useCliStore } from '../store/cliStore'
+import { terminalMarkdown } from '../lib/terminalMarkdown'
 
 const HELP = `AWS CLI terminal — only "aws" commands are allowed.
 Examples:
@@ -136,6 +137,19 @@ export function CliPanel() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  function downloadLogs() {
+    const exportedAt = new Date()
+    const blob = new Blob([terminalMarkdown(lines, exportedAt)], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `terminal-logs-${exportedAt.toISOString().replace(/[:.]/g, '-')}.md`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [lines])
@@ -221,6 +235,19 @@ export function CliPanel() {
       onClick={() => inputRef.current?.focus()}
     >
       <div className="flex items-center justify-end border-b border-gray-800 px-3 py-1">
+        <button
+          type="button"
+          disabled={lines.length === 0}
+          onClick={(e) => {
+            e.stopPropagation()
+            downloadLogs()
+          }}
+          className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] text-gray-400 transition hover:bg-gray-800 hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+          title="Download saved terminal commands and output as Markdown"
+        >
+          <Download aria-hidden="true" className="h-3 w-3" />
+          Download Markdown
+        </button>
         <button
           type="button"
           onClick={(e) => {
