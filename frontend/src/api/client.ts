@@ -1,8 +1,11 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
 
-// In dev, Vite proxies /api to the FastAPI backend (see vite.config.ts).
-export const api = axios.create({ baseURL: '/' })
+// Backend base URL comes from the environment (VITE_API_URL). Requests are made
+// cross-origin directly to FastAPI; the backend allows this origin via CORS.
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+})
 
 // Attach the JWT for register-mode requests.
 api.interceptors.request.use((config) => {
