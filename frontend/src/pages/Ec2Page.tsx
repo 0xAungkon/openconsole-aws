@@ -1,11 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Cpu, Play, Plus, RefreshCw, Search, Square, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import {
+  Check,
+  Copy,
+  Cpu,
+  Play,
+  Plus,
+  RefreshCw,
+  Search,
+  Square,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { runQuery } from '../api/proxy'
 import { ActionForm } from '../components/ActionForm'
 import { Card } from '../components/Card'
-import { Drawer } from '../components/Drawer'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { StateBadge } from '../components/StateBadge'
 import { flattenInstances, timeAgo, type InstanceRow } from '../lib/ec2'
@@ -14,6 +24,8 @@ import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
 const launchAction = getService('ec2')!.actions.find((a) => a.id === 'run_instances')!
+
+const PAGE_SIZE = 30
 
 type StatusFilter = 'all' | 'running' | 'stopped' | 'other'
 
@@ -70,6 +82,24 @@ export function Ec2Page() {
           r.Name.toLowerCase().includes(q)),
     )
   }, [rows, search, status])
+
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+
+  // Reset to the first page whenever the filter/search/region changes.
+  useEffect(() => {
+    setPage(1)
+  }, [search, status, region])
+
+  // Clamp the page if the list shrinks (e.g. after terminating instances).
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page],
+  )
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['ec2-instances'] })
@@ -166,8 +196,11 @@ export function Ec2Page() {
 
       {lifecycle.isError && <ErrorAlert error={lifecycle.error} />}
 
-      {/* Body */}
-      {needsProfile ? (
+      {/* Split pane: table on the left, launch form docked on the right */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className={`min-w-0 flex-1 ${launchOpen ? 'lg:w-[70%]' : ''}`}>
+          {/* Body */}
+          {needsProfile ? (
         <Card title="Compute">
           <p className="text-sm text-amber-600">
             Select an AWS profile from the account menu to view your servers.
@@ -195,7 +228,7 @@ export function Ec2Page() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
+                {paged.map((r) => (
                   <InstanceRowView
                     key={r.InstanceId}
                     row={r}
@@ -207,22 +240,73 @@ export function Ec2Page() {
               </tbody>
             </table>
           </div>
+          <div className="flex items-center justify-between gap-2 border-t border-gray-100 px-4 py-2.5 text-xs text-gray-500 dark:border-gray-800">
+            <span>
+              Showing {(page - 1) * PAGE_SIZE + 1}–
+              {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="rounded-md border border-gray-300 px-2 py-1 font-medium transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:hover:bg-gray-800"
+                >
+                  Previous
+                </button>
+                <span className="px-2">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="rounded-md border border-gray-300 px-2 py-1 font-medium transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:hover:bg-gray-800"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
+        </div>
 
-      {/* Launch drawer */}
-      <Drawer open={launchOpen} onClose={() => setLaunchOpen(false)} title="Launch a new server">
-        {launch.isError && (
-          <div className="mb-3">
-            <ErrorAlert error={launch.error} />
-          </div>
+        {/* Launch panel — docked to the right, ~40% width */}
+        {launchOpen && (
+          <aside className="w-full shrink-0 lg:sticky lg:top-0 lg:w-[30%]">
+            <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+              <header className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                  <span className="inline-block h-4 w-[3px] rounded-full bg-brand-500" />
+                  Launch a new server
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setLaunchOpen(false)}
+                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </header>
+              <div className="p-4">
+                {launch.isError && (
+                  <div className="mb-3">
+                    <ErrorAlert error={launch.error} />
+                  </div>
+                )}
+                <ActionForm
+                  action={launchAction}
+                  running={launch.isPending}
+                  onRun={(params) => launch.mutate(params)}
+                />
+              </div>
+            </div>
+          </aside>
         )}
-        <ActionForm
-          action={launchAction}
-          running={launch.isPending}
-          onRun={(params) => launch.mutate(params)}
-        />
-      </Drawer>
+      </div>
     </div>
   )
 }
@@ -268,9 +352,21 @@ function InstanceRowView({
   onOpen: () => void
   onAct: (op: string, id: string) => void
 }) {
+  const [copied, setCopied] = useState(false)
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   const iconBtn =
     'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40'
+
+  async function copyId(e: React.MouseEvent) {
+    stop(e)
+    try {
+      await navigator.clipboard.writeText(row.InstanceId)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* clipboard unavailable — ignore */
+    }
+  }
 
   return (
     <tr
@@ -281,7 +377,22 @@ function InstanceRowView({
         <div className="font-medium text-gray-800 dark:text-gray-100">
           {row.Name || 'Unnamed server'}
         </div>
-        <div className="font-mono text-xs text-gray-400">{row.InstanceId}</div>
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-xs text-gray-400">{row.InstanceId}</span>
+          <button
+            type="button"
+            onClick={copyId}
+            className="rounded p-0.5 text-gray-400 transition hover:bg-gray-100 hover:text-brand-600 dark:hover:bg-gray-800"
+            title="Copy instance ID"
+            aria-label="Copy instance ID"
+          >
+            {copied ? (
+              <Check className="h-3 w-3 text-green-500" />
+            ) : (
+              <Copy className="h-3 w-3" />
+            )}
+          </button>
+        </div>
       </td>
       <td className="px-4 py-2.5">
         <StateBadge state={row.State} />
