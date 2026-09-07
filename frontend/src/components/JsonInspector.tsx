@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
 interface JsonInspectorProps {
@@ -16,7 +17,9 @@ export function JsonInspector({ value, defaultOpen = false }: JsonInspectorProps
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
       >
-        <span className={`transition ${open ? 'rotate-90' : ''}`}>▶</span>
+        <ChevronRight
+          className={`h-3.5 w-3.5 transition ${open ? 'rotate-90' : ''}`}
+        />
         Raw JSON
       </button>
       {open && (

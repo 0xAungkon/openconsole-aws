@@ -1,3 +1,5 @@
+import type { LucideIcon } from 'lucide-react'
+
 export type Mode = 'guest' | 'register'
 
 export interface GuestCreds {

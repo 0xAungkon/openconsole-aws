@@ -1,3 +1,4 @@
+import { Database, KeyRound, Server, Boxes, Zap } from 'lucide-react'
 import type { Row, ServiceDef } from '../types'
 
 // Declarative source of truth for every service page. Adding a service or action
@@ -7,7 +8,7 @@ export const CATALOG: ServiceDef[] = [
   {
     key: 'ec2',
     label: 'EC2',
-    icon: '🖥️',
+    icon: Server,
     summary: 'Elastic Compute Cloud instances',
     actions: [
       {
@@ -84,7 +85,7 @@ export const CATALOG: ServiceDef[] = [
   {
     key: 's3',
     label: 'S3',
-    icon: '🪣',
+    icon: Boxes,
     summary: 'Simple Storage Service buckets & objects',
     actions: [
       {
@@ -146,7 +147,7 @@ export const CATALOG: ServiceDef[] = [
   {
     key: 'lambda',
     label: 'Lambda',
-    icon: 'λ',
+    icon: Zap,
     summary: 'Serverless functions',
     actions: [
       {
@@ -208,7 +209,7 @@ export const CATALOG: ServiceDef[] = [
   {
     key: 'iam',
     label: 'IAM',
-    icon: '🔑',
+    icon: KeyRound,
     summary: 'Identity & Access Management',
     actions: [
       {
@@ -270,7 +271,7 @@ export const CATALOG: ServiceDef[] = [
   {
     key: 'rds',
     label: 'RDS',
-    icon: '🗄️',
+    icon: Database,
     summary: 'Relational Database Service',
     actions: [
       {

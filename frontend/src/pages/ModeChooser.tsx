@@ -1,3 +1,4 @@
+import { Hexagon, Lock, Rocket } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 export function ModeChooser() {
@@ -6,7 +7,7 @@ export function ModeChooser() {
     <div className="flex min-h-full items-center justify-center p-6">
       <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
-          <div className="text-4xl">⬡</div>
+          <Hexagon className="mx-auto h-10 w-10 text-brand-500" />
           <h1 className="mt-2 text-2xl font-semibold text-gray-800 dark:text-gray-100">
             AWS OpenConsole
           </h1>
@@ -21,7 +22,7 @@ export function ModeChooser() {
             onClick={() => navigate('/guest')}
             className="rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
           >
-            <div className="text-2xl">🚀</div>
+            <Rocket className="h-6 w-6 text-brand-500" />
             <h2 className="mt-3 font-semibold text-gray-800 dark:text-gray-100">
               Guest mode
             </h2>
@@ -36,7 +37,7 @@ export function ModeChooser() {
             onClick={() => navigate('/login')}
             className="rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
           >
-            <div className="text-2xl">🔐</div>
+            <Lock className="h-6 w-6 text-brand-500" />
             <h2 className="mt-3 font-semibold text-gray-800 dark:text-gray-100">
               Register mode
             </h2>

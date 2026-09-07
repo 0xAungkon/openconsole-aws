@@ -8,8 +8,8 @@ export function ResourceList() {
     <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
       {CATALOG.map((s) => (
         <li key={s.key} className="flex items-center gap-3 py-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-50 text-lg dark:bg-gray-800">
-            {s.icon}
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-50 text-brand-600 dark:bg-gray-800 dark:text-brand-300">
+            <s.icon className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-gray-800 dark:text-gray-100">

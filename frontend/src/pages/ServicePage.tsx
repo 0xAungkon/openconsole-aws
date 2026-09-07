@@ -47,7 +47,12 @@ export function ServicePage() {
   return (
     <div className="flex flex-col gap-4">
       <Card
-        title={`${def.icon} ${def.label}`}
+        title={
+          <span className="flex items-center gap-2">
+            <def.icon className="h-4 w-4 text-brand-500" />
+            {def.label}
+          </span>
+        }
         actions={
           <div className="flex flex-wrap gap-1">
             {def.actions.map((a) => (

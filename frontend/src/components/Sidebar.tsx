@@ -1,3 +1,11 @@
+import {
+  Hexagon,
+  Home,
+  Lock,
+  PanelLeftClose,
+  PanelLeftOpen,
+  type LucideIcon,
+} from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { CATALOG } from '../services/catalog'
 import { useAuthStore } from '../store/authStore'
@@ -11,11 +19,11 @@ export function Sidebar({ onEndpointClick }: SidebarProps) {
   const { sidebarCollapsed, toggleSidebar, endpointUrl } = useSessionStore()
   const mode = useAuthStore((s) => s.mode)
 
-  const navItems = [
-    { key: '', label: 'Overview', icon: '🏠', end: true },
+  const navItems: { key: string; label: string; icon: LucideIcon; end: boolean }[] = [
+    { key: '', label: 'Overview', icon: Home, end: true },
     ...CATALOG.map((s) => ({ key: s.key, label: s.label, icon: s.icon, end: false })),
     ...(mode === 'register'
-      ? [{ key: 'profiles', label: 'Profiles', icon: '🔒', end: false }]
+      ? [{ key: 'profiles', label: 'Profiles', icon: Lock, end: false }]
       : []),
   ]
 
@@ -31,7 +39,7 @@ export function Sidebar({ onEndpointClick }: SidebarProps) {
       <div className="flex items-center justify-between px-3 py-4">
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2">
-            <span className="text-xl">⬡</span>
+            <Hexagon className="h-5 w-5 text-brand-500" />
             <span className="text-sm font-semibold leading-tight text-gray-800 dark:text-gray-100">
               AWS
               <br />
@@ -45,7 +53,11 @@ export function Sidebar({ onEndpointClick }: SidebarProps) {
           className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
           aria-label="Toggle sidebar"
         >
-          {sidebarCollapsed ? '»' : '«'}
+          {sidebarCollapsed ? (
+            <PanelLeftOpen className="h-4 w-4" />
+          ) : (
+            <PanelLeftClose className="h-4 w-4" />
+          )}
         </button>
       </div>
 
@@ -64,7 +76,7 @@ export function Sidebar({ onEndpointClick }: SidebarProps) {
             }
             title={item.label}
           >
-            <span className="text-base">{item.icon}</span>
+            <item.icon className="h-4 w-4 shrink-0" />
             {!sidebarCollapsed && <span>{item.label}</span>}
           </NavLink>
         ))}
