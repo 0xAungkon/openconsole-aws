@@ -25,6 +25,7 @@ import { ImageHardwareCard, InstanceHealthCard, InstanceFirewallRulesCard } from
 import { flattenInstances, timeAgo, type InstanceRow } from '../lib/ec2'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
+import { useToastStore } from '../store/toastStore'
 
 /** Shared mutation that runs an EC2 operation and refreshes instance/list/volume data. */
 function useEc2Mutation() {
@@ -165,7 +166,7 @@ export function Ec2InstancePage() {
 
           {power.isError && <ErrorAlert error={power.error} />}
 
-          <div className="grid items-start gap-5 lg:grid-cols-2">
+          <div className="columns-1 gap-5 lg:columns-2 [&>section]:mb-5 [&>section]:break-inside-avoid">
             <Card title="Overview">
               <dl className="divide-y divide-gray-100 dark:divide-gray-800">
                 <Detail label="Status" value={<StateBadge state={row.State} />} />
@@ -557,6 +558,7 @@ function TagsCard({ row, instanceId }: { row: InstanceRow; instanceId: string })
 function BackupCard({ instanceId }: { instanceId: string }) {
   const [name, setName] = useState('')
   const create = useEc2Mutation()
+  const notify = useToastStore((s) => s.add)
 
   return (
     <Card
@@ -586,7 +588,13 @@ function BackupCard({ instanceId }: { instanceId: string }) {
                   op: 'create_image',
                   params: { InstanceId: instanceId, Name: name.trim() },
                 },
-                { onSuccess: () => setName('') },
+                {
+                  onSuccess: (_result, variables) => {
+                    setName('')
+                    notify('success', `Image creation started for “${variables.params.Name}”. It will appear in your AMIs when ready.`)
+                  },
+                  onError: (error) => notify('error', `Could not create the backup image: ${error.message}`),
+                },
               )
             }
             disabled={!name.trim() || create.isPending}
@@ -595,12 +603,6 @@ function BackupCard({ instanceId }: { instanceId: string }) {
             {create.isPending ? 'Creating…' : 'Create image'}
           </button>
         </div>
-        {create.isSuccess && (
-          <p className="text-xs text-green-600">
-            Image creation started — it will appear under your AMIs shortly.
-          </p>
-        )}
-        {create.isError && <ErrorAlert error={create.error} />}
       </div>
     </Card>
   )

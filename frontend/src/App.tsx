@@ -11,6 +11,7 @@ import { Overview } from './pages/Overview'
 import { ServicePage } from './pages/ServicePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { useAuthStore } from './store/authStore'
+import { Toasts } from './components/Toasts'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { mode, token } = useAuthStore()
@@ -23,6 +24,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
+    <>
+    <Toasts />
     <Routes>
       <Route path="/" element={<ModeChooser />} />
       <Route path="/login" element={<AuthPage initialTab="login" />} />
@@ -54,5 +57,6 @@ export default function App() {
 
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </>
   )
 }
