@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { appendHistory, clearHistory } from './historyEvents'
 
 export interface LogEntry {
   id: string
@@ -31,12 +32,13 @@ const MAX = 200
 
 export const useLogStore = create<LogState>((set, get) => ({
   entries: [],
-  add: (entry) =>
-    set({
-      entries: [
-        { ...entry, id: crypto.randomUUID(), ts: Date.now() },
-        ...get().entries,
-      ].slice(0, MAX),
-    }),
-  clear: () => set({ entries: [] }),
+  add: (entry) => {
+    const saved = { ...entry, id: crypto.randomUUID(), ts: Date.now() }
+    set({ entries: [saved, ...get().entries].slice(0, MAX) })
+    appendHistory('inspector', [saved])
+  },
+  clear: () => {
+    set({ entries: [] })
+    clearHistory('inspector')
+  },
 }))

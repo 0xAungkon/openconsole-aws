@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { appendHistory, clearHistory } from './historyEvents'
 
 export interface CliLine {
   kind: 'cmd' | 'out' | 'err' | 'info'
@@ -22,22 +22,20 @@ interface CliState {
   clear: () => void
 }
 
-/**
- * Terminal state persisted to localStorage so the CLI survives switching panels,
- * closing the dock, and full page reloads. `clear` resets the visible output but
- * keeps command history intact.
- */
-export const useCliStore = create<CliState>()(
-  persist(
-    (set) => ({
-      lines: [WELCOME_LINE],
-      history: [],
-      push: (...lines) =>
-        set((s) => ({ lines: [...s.lines, ...lines].slice(-MAX_LINES) })),
-      addHistory: (cmd) =>
-        set((s) => ({ history: [...s.history, cmd].slice(-MAX_HISTORY) })),
-      clear: () => set({ lines: [] }),
-    }),
-    { name: 'aws-openconsole-cli' },
-  ),
-)
+// Persistence is coordinated by historySync so guest and account data stay separate.
+export const useCliStore = create<CliState>((set) => ({
+  lines: [WELCOME_LINE],
+  history: [],
+  push: (...lines) => {
+    set((s) => ({ lines: [...s.lines, ...lines].slice(-MAX_LINES) }))
+    appendHistory('terminal', lines)
+  },
+  addHistory: (cmd) => {
+    set((s) => ({ history: [...s.history, cmd].slice(-MAX_HISTORY) }))
+    appendHistory('commands', [{ text: cmd }])
+  },
+  clear: () => {
+    set({ lines: [] })
+    clearHistory('terminal')
+  },
+}))
