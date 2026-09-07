@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './pages/AppLayout'
 import { AuthPage } from './pages/AuthPage'
+import { Ec2InstancePage } from './pages/Ec2InstancePage'
 import { Ec2Page } from './pages/Ec2Page'
 import { ModeChooser } from './pages/ModeChooser'
 import { NotFound } from './pages/NotFound'
@@ -47,6 +48,7 @@ export default function App() {
         <Route index element={<Overview />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="ec2" element={<Ec2Page />} />
+        <Route path="ec2/:instanceId" element={<Ec2InstancePage />} />
         <Route path=":service" element={<ServicePage />} />
       </Route>
 

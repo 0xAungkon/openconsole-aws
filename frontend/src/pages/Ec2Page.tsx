@@ -1,93 +1,40 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  Info,
-  Play,
-  Plus,
-  RefreshCw,
-  Search,
-  Server,
-  Square,
-  Trash2,
-} from 'lucide-react'
+import { Cpu, Play, Plus, RefreshCw, Search, Square, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { runQuery } from '../api/proxy'
 import { ActionForm } from '../components/ActionForm'
 import { Card } from '../components/Card'
 import { Drawer } from '../components/Drawer'
 import { ErrorAlert } from '../components/ErrorAlert'
+import { StateBadge } from '../components/StateBadge'
+import { flattenInstances, timeAgo, type InstanceRow } from '../lib/ec2'
 import { getService } from '../services/catalog'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
-interface InstanceRow {
-  InstanceId: string
-  Name: string
-  State: string
-  InstanceType: string
-  AZ: string
-  PublicIpAddress: string
-  PrivateIpAddress: string
-  LaunchTime: string
-  KeyName: string
-  _raw: any
-}
-
-function flatten(data: any): InstanceRow[] {
-  return (data?.Reservations ?? []).flatMap((res: any) =>
-    (res.Instances ?? []).map(
-      (i: any): InstanceRow => ({
-        InstanceId: i.InstanceId,
-        Name: i.Tags?.find((t: any) => t.Key === 'Name')?.Value ?? '',
-        State: i.State?.Name ?? '',
-        InstanceType: i.InstanceType ?? '',
-        AZ: i.Placement?.AvailabilityZone ?? '',
-        PublicIpAddress: i.PublicIpAddress ?? '',
-        PrivateIpAddress: i.PrivateIpAddress ?? '',
-        LaunchTime: i.LaunchTime ?? '',
-        KeyName: i.KeyName ?? '',
-        _raw: i,
-      }),
-    ),
-  )
-}
-
-function stateColor(state: string): string {
-  switch (state) {
-    case 'running':
-      return 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
-    case 'stopped':
-      return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
-    case 'terminated':
-      return 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
-    default:
-      // pending, stopping, shutting-down, rebooting…
-      return 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-  }
-}
-
-function StateBadge({ state }: { state: string }) {
-  return (
-    <span
-      className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${stateColor(
-        state,
-      )}`}
-    >
-      {state || 'unknown'}
-    </span>
-  )
-}
-
 const launchAction = getService('ec2')!.actions.find((a) => a.id === 'run_instances')!
 
+type StatusFilter = 'all' | 'running' | 'stopped' | 'other'
+
+function matchesStatus(state: string, filter: StatusFilter): boolean {
+  if (filter === 'all') return true
+  if (filter === 'running') return state === 'running'
+  if (filter === 'stopped') return state === 'stopped'
+  return state !== 'running' && state !== 'stopped'
+}
+
 export function Ec2Page() {
+  const { profile } = useParams()
+  const navigate = useNavigate()
   const mode = useAuthStore((s) => s.mode)
   const activeProfileId = useSessionStore((s) => s.activeProfileId)
   const region = useSessionStore((s) => s.region)
   const queryClient = useQueryClient()
 
   const [search, setSearch] = useState('')
+  const [status, setStatus] = useState<StatusFilter>('all')
   const [launchOpen, setLaunchOpen] = useState(false)
-  const [details, setDetails] = useState<InstanceRow | null>(null)
 
   const needsProfile = mode === 'register' && activeProfileId == null
 
@@ -97,17 +44,32 @@ export function Ec2Page() {
     enabled: !needsProfile,
   })
 
-  const rows = useMemo(() => flatten(instancesQuery.data), [instancesQuery.data])
+  const rows = useMemo(
+    () => flattenInstances(instancesQuery.data),
+    [instancesQuery.data],
+  )
+
+  const counts = useMemo(
+    () => ({
+      all: rows.length,
+      running: rows.filter((r) => r.State === 'running').length,
+      stopped: rows.filter((r) => r.State === 'stopped').length,
+      other: rows.filter((r) => r.State !== 'running' && r.State !== 'stopped')
+        .length,
+    }),
+    [rows],
+  )
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return rows
     return rows.filter(
       (r) =>
-        r.InstanceId.toLowerCase().includes(q) ||
-        r.Name.toLowerCase().includes(q),
+        matchesStatus(r.State, status) &&
+        (!q ||
+          r.InstanceId.toLowerCase().includes(q) ||
+          r.Name.toLowerCase().includes(q)),
     )
-  }, [rows, search])
+  }, [rows, search, status])
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['ec2-instances'] })
@@ -131,177 +93,125 @@ export function Ec2Page() {
 
   function act(op: string, id: string) {
     if (op === 'terminate_instances') {
-      if (!window.confirm(`Terminate ${id}? This permanently deletes the instance.`))
+      if (!window.confirm(`Terminate ${id}? This permanently deletes the server.`))
         return
     }
     lifecycle.mutate({ op, id })
   }
 
-  const iconBtn =
-    'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40'
+  const FILTERS: { key: StatusFilter; label: string }[] = [
+    { key: 'all', label: 'All servers' },
+    { key: 'running', label: 'Running' },
+    { key: 'stopped', label: 'Stopped' },
+    { key: 'other', label: 'Other' },
+  ]
 
   return (
     <div className="flex flex-col gap-4">
-      <Card
-        title={
-          <span className="flex items-center gap-2">
-            <Server className="h-4 w-4 text-brand-500" />
-            Compute
-            <span className="rounded bg-gray-100 px-1 text-[10px] font-medium uppercase text-gray-400 dark:bg-gray-800 dark:text-gray-500">
-              ec2
-            </span>
-          </span>
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name or id"
-                className="w-44 rounded-md border border-gray-300 py-1 pl-7 pr-2 text-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => invalidate()}
-              disabled={instancesQuery.isFetching}
-              className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-50 dark:hover:bg-gray-800"
-              title="Refresh"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${instancesQuery.isFetching ? 'animate-spin' : ''}`}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => setLaunchOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-brand-500 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-brand-600"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Launch instance
-            </button>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+            Your servers
+          </h1>
+          <p className="text-xs text-gray-400">
+            Virtual machines running in {region}
+          </p>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or ID"
+              className="w-52 rounded-md border border-gray-300 py-2 pl-8 pr-2 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+            />
           </div>
-        }
-      >
-        {needsProfile ? (
+          {!needsProfile && (
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as StatusFilter)}
+              className="rounded-md border border-gray-300 py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+              title="Filter by status"
+            >
+              {FILTERS.map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label} ({counts[f.key]})
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            onClick={() => invalidate()}
+            disabled={instancesQuery.isFetching}
+            className="rounded-md border border-gray-300 p-2 text-gray-500 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
+            title="Refresh"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${instancesQuery.isFetching ? 'animate-spin' : ''}`}
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => setLaunchOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-brand-500 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-600"
+          >
+            <Plus className="h-4 w-4" />
+            New server
+          </button>
+        </div>
+      </div>
+
+      {lifecycle.isError && <ErrorAlert error={lifecycle.error} />}
+
+      {/* Body */}
+      {needsProfile ? (
+        <Card title="Compute">
           <p className="text-sm text-amber-600">
-            Select an AWS profile from the account menu to view instances.
+            Select an AWS profile from the account menu to view your servers.
           </p>
-        ) : instancesQuery.isError ? (
-          <ErrorAlert error={instancesQuery.error} />
-        ) : instancesQuery.isLoading ? (
-          <p className="py-6 text-center text-sm text-gray-400">Loading instances…</p>
-        ) : filtered.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-400">
-            {rows.length === 0
-              ? 'No instances in this region. Launch one to get started.'
-              : 'No instances match your search.'}
-          </p>
-        ) : (
+        </Card>
+      ) : instancesQuery.isError ? (
+        <ErrorAlert error={instancesQuery.error} />
+      ) : instancesQuery.isLoading ? (
+        <p className="py-16 text-center text-sm text-gray-400">Loading your servers…</p>
+      ) : filtered.length === 0 ? (
+        <EmptyState hasAny={rows.length > 0} onLaunch={() => setLaunchOpen(true)} />
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800">
-                  <th className="px-3 py-2 font-medium">Name</th>
-                  <th className="px-3 py-2 font-medium">Instance ID</th>
-                  <th className="px-3 py-2 font-medium">State</th>
-                  <th className="px-3 py-2 font-medium">Type</th>
-                  <th className="px-3 py-2 font-medium">AZ</th>
-                  <th className="px-3 py-2 font-medium">Public IP</th>
-                  <th className="px-3 py-2 text-right font-medium">Actions</th>
+                  <th className="px-4 py-2.5 font-medium">Name</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
+                  <th className="px-4 py-2.5 font-medium">Size</th>
+                  <th className="px-4 py-2.5 font-medium">Zone</th>
+                  <th className="px-4 py-2.5 font-medium">Public IP</th>
+                  <th className="px-4 py-2.5 font-medium">Launched</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => {
-                  const busy = pendingId === r.InstanceId
-                  return (
-                    <tr
-                      key={r.InstanceId}
-                      className="border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
-                    >
-                      <td className="px-3 py-2 text-gray-700 dark:text-gray-200">
-                        {r.Name || <span className="text-gray-400">—</span>}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">
-                        {r.InstanceId}
-                      </td>
-                      <td className="px-3 py-2">
-                        <StateBadge state={r.State} />
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs text-gray-600 dark:text-gray-400">
-                        {r.InstanceType}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs text-gray-600 dark:text-gray-400">
-                        {r.AZ}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs text-gray-600 dark:text-gray-400">
-                        {r.PublicIpAddress || '—'}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => act('start_instances', r.InstanceId)}
-                            disabled={busy || r.State !== 'stopped'}
-                            className={`${iconBtn} text-green-600 hover:bg-green-50 dark:hover:bg-green-950/40`}
-                            title="Start"
-                          >
-                            <Play className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => act('stop_instances', r.InstanceId)}
-                            disabled={busy || r.State !== 'running'}
-                            className={`${iconBtn} text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40`}
-                            title="Stop"
-                          >
-                            <Square className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => act('terminate_instances', r.InstanceId)}
-                            disabled={busy || r.State === 'terminated'}
-                            className={`${iconBtn} text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40`}
-                            title="Terminate"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDetails(r)}
-                            className={`${iconBtn} text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800`}
-                            title="Details"
-                          >
-                            <Info className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {filtered.map((r) => (
+                  <InstanceRowView
+                    key={r.InstanceId}
+                    row={r}
+                    busy={pendingId === r.InstanceId}
+                    onOpen={() => navigate(`/${profile}/ec2/${r.InstanceId}`)}
+                    onAct={act}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
-        )}
-
-        {lifecycle.isError && (
-          <div className="mt-3">
-            <ErrorAlert error={lifecycle.error} />
-          </div>
-        )}
-        <p className="mt-3 text-xs text-gray-400">
-          {filtered.length} of {rows.length} instance{rows.length === 1 ? '' : 's'}
-        </p>
-      </Card>
+        </div>
+      )}
 
       {/* Launch drawer */}
-      <Drawer
-        open={launchOpen}
-        onClose={() => setLaunchOpen(false)}
-        title="Launch instance"
-      >
+      <Drawer open={launchOpen} onClose={() => setLaunchOpen(false)} title="Launch a new server">
         {launch.isError && (
           <div className="mb-3">
             <ErrorAlert error={launch.error} />
@@ -313,81 +223,117 @@ export function Ec2Page() {
           onRun={(params) => launch.mutate(params)}
         />
       </Drawer>
-
-      {/* Details drawer */}
-      <Drawer
-        open={details !== null}
-        onClose={() => setDetails(null)}
-        title={
-          <span className="flex items-center gap-2">
-            Instance details
-            {details && <StateBadge state={details.State} />}
-          </span>
-        }
-        width="max-w-lg"
-      >
-        {details && <InstanceDetails row={details} />}
-      </Drawer>
     </div>
   )
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function EmptyState({ hasAny, onLaunch }: { hasAny: boolean; onLaunch: () => void }) {
   return (
-    <div className="flex gap-3 py-1.5 text-sm">
-      <span className="w-32 shrink-0 text-gray-400">{label}</span>
-      <span className="min-w-0 break-all font-mono text-xs text-gray-700 dark:text-gray-200">
-        {value || '—'}
-      </span>
-    </div>
-  )
-}
-
-function InstanceDetails({ row }: { row: InstanceRow }) {
-  const tags: { Key: string; Value: string }[] = row._raw?.Tags ?? []
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="divide-y divide-gray-100 dark:divide-gray-800">
-        <DetailRow label="Instance ID" value={row.InstanceId} />
-        <DetailRow label="Name" value={row.Name} />
-        <DetailRow label="State" value={row.State} />
-        <DetailRow label="Type" value={row.InstanceType} />
-        <DetailRow label="Availability zone" value={row.AZ} />
-        <DetailRow label="Public IP" value={row.PublicIpAddress} />
-        <DetailRow label="Private IP" value={row.PrivateIpAddress} />
-        <DetailRow label="Key pair" value={row.KeyName} />
-        <DetailRow
-          label="Launch time"
-          value={row.LaunchTime ? String(row.LaunchTime) : ''}
-        />
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-gray-300 py-16 text-center dark:border-gray-700">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-gray-800">
+        <Cpu className="h-6 w-6" />
       </div>
-
-      {tags.length > 0 && (
-        <div>
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-            Tags
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {tags.map((t) => (
-              <span
-                key={t.Key}
-                className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-              >
-                {t.Key}={t.Value}
-              </span>
-            ))}
-          </div>
-        </div>
+      <div>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+          {hasAny ? 'No servers match your filters' : 'No servers yet'}
+        </p>
+        <p className="text-xs text-gray-400">
+          {hasAny
+            ? 'Try a different status or search term.'
+            : 'Launch your first server to get started.'}
+        </p>
+      </div>
+      {!hasAny && (
+        <button
+          type="button"
+          onClick={onLaunch}
+          className="inline-flex items-center gap-1.5 rounded-md bg-brand-500 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-brand-600"
+        >
+          <Plus className="h-4 w-4" />
+          New server
+        </button>
       )}
-
-      <details className="rounded-md border border-gray-200 dark:border-gray-800">
-        <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300">
-          Raw JSON
-        </summary>
-        <pre className="max-h-96 overflow-auto border-t border-gray-100 px-3 py-2 font-mono text-[11px] leading-relaxed text-gray-700 dark:border-gray-800 dark:text-gray-300">
-          {JSON.stringify(row._raw, null, 2)}
-        </pre>
-      </details>
     </div>
+  )
+}
+
+function InstanceRowView({
+  row,
+  busy,
+  onOpen,
+  onAct,
+}: {
+  row: InstanceRow
+  busy: boolean
+  onOpen: () => void
+  onAct: (op: string, id: string) => void
+}) {
+  const stop = (e: React.MouseEvent) => e.stopPropagation()
+  const iconBtn =
+    'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40'
+
+  return (
+    <tr
+      onClick={onOpen}
+      className="cursor-pointer border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+    >
+      <td className="px-4 py-2.5">
+        <div className="font-medium text-gray-800 dark:text-gray-100">
+          {row.Name || 'Unnamed server'}
+        </div>
+        <div className="font-mono text-xs text-gray-400">{row.InstanceId}</div>
+      </td>
+      <td className="px-4 py-2.5">
+        <StateBadge state={row.State} />
+      </td>
+      <td className="px-4 py-2.5 text-gray-600 dark:text-gray-300">{row.InstanceType}</td>
+      <td className="px-4 py-2.5 text-gray-600 dark:text-gray-300">{row.AZ}</td>
+      <td className="px-4 py-2.5 font-mono text-xs text-gray-600 dark:text-gray-400">
+        {row.PublicIpAddress || '—'}
+      </td>
+      <td className="px-4 py-2.5 text-gray-600 dark:text-gray-300">
+        {timeAgo(row.LaunchTime)}
+      </td>
+      <td className="px-4 py-2.5">
+        <div className="flex items-center justify-end gap-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              stop(e)
+              onAct('start_instances', row.InstanceId)
+            }}
+            disabled={busy || row.State !== 'stopped'}
+            className={`${iconBtn} text-green-600 hover:bg-green-50 dark:hover:bg-green-950/40`}
+            title="Start"
+          >
+            <Play className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              stop(e)
+              onAct('stop_instances', row.InstanceId)
+            }}
+            disabled={busy || row.State !== 'running'}
+            className={`${iconBtn} text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40`}
+            title="Stop"
+          >
+            <Square className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              stop(e)
+              onAct('terminate_instances', row.InstanceId)
+            }}
+            disabled={busy || row.State === 'terminated'}
+            className={`${iconBtn} text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40`}
+            title="Delete"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </td>
+    </tr>
   )
 }

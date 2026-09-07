@@ -94,7 +94,7 @@ export function ServicePage() {
             <DataTable columns={action.columns} rows={action.getRows(run.data)} />
           ) : (
             <p className="text-sm text-green-600">
-              Request succeeded — full response is available in Response logs.
+              Request completed successfully — open the Inspector below for full details.
             </p>
           )}
         </Card>
