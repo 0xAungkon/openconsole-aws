@@ -1,4 +1,5 @@
 import type { ProxyError, ProxyResponse } from '../types'
+import { toAwsCliCommand } from '../lib/awscli'
 import { useAuthStore } from '../store/authStore'
 import { useLogStore } from '../store/logStore'
 import { useSessionStore } from '../store/sessionStore'
@@ -53,12 +54,19 @@ export async function runQuery<T = unknown>(
   const data = res.data
   const durationMs = Math.round(performance.now() - started)
 
+  const command = toAwsCliCommand(service, operation, params, {
+    region: body.region as string,
+    endpoint: (body.endpoint_url as string) || undefined,
+  })
+
   if (!data || data.ok === false) {
     const error = data?.error ?? {
       code: 'RequestError',
       message: `Request failed with status ${res.status}`,
     }
     useLogStore.getState().add({
+      source: 'gui',
+      command,
       service,
       operation,
       params,
@@ -70,6 +78,8 @@ export async function runQuery<T = unknown>(
   }
 
   useLogStore.getState().add({
+    source: 'gui',
+    command,
     service,
     operation,
     params,

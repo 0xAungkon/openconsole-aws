@@ -38,15 +38,23 @@ function buildParams(
   return params
 }
 
+function initialValues(fields: ActionField[]): Record<string, string> {
+  const v: Record<string, string> = {}
+  for (const f of fields) if (f.default != null) v[f.name] = f.default
+  return v
+}
+
 export function ActionForm({ action, running, onRun }: ActionFormProps) {
-  const [values, setValues] = useState<Record<string, string>>({})
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    initialValues(action.fields),
+  )
   const [jsonError, setJsonError] = useState<string | null>(null)
 
-  // Reset form fields when the selected action changes.
+  // Reset form fields (to their defaults) when the selected action changes.
   useEffect(() => {
-    setValues({})
+    setValues(initialValues(action.fields))
     setJsonError(null)
-  }, [action.id])
+  }, [action.id, action.fields])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()

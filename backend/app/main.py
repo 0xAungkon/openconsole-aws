@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routes import auth, credentials, proxy
+from app.routes import auth, cli, credentials, proxy
 
 app = FastAPI(title="AWS OpenConsole API", version="0.1.0")
 
@@ -17,6 +17,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(credentials.router)
 app.include_router(proxy.router)
+app.include_router(cli.router)
 
 
 @app.get("/api/health", tags=["health"])

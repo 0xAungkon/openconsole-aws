@@ -1,5 +1,6 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
+import { generateCodename } from '../lib/codename'
 import { AWS_REGIONS } from '../store/sessionStore'
 import { ErrorAlert } from './ErrorAlert'
 
@@ -44,7 +45,10 @@ export function CredentialForm({
   error,
   onSubmit,
 }: CredentialFormProps) {
-  const [form, setForm] = useState(EMPTY)
+  // Register mode auto-generates a friendly Name (e.g. "cosmic-falcon").
+  const [form, setForm] = useState(() =>
+    withLabel ? { ...EMPTY, label: generateCodename() } : EMPTY,
+  )
   const [advancedOpen, setAdvancedOpen] = useState(false)
 
   const input =
@@ -62,14 +66,24 @@ export function CredentialForm({
     >
       {withLabel && (
         <label className="flex flex-col gap-1 text-sm">
-          <span className={labelText}>Profile label{req}</span>
-          <input
-            className={input}
-            placeholder="e.g. dev"
-            value={form.label}
-            onChange={(e) => setForm({ ...form, label: e.target.value })}
-            required
-          />
+          <span className={labelText}>Name</span>
+          <div className="flex items-center gap-2">
+            <input
+              className={input}
+              placeholder="auto-generated"
+              value={form.label}
+              onChange={(e) => setForm({ ...form, label: e.target.value })}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, label: generateCodename() }))}
+              className="shrink-0 rounded-md border border-gray-300 p-2 text-gray-500 hover:bg-gray-50 hover:text-brand-600 dark:border-gray-700 dark:hover:bg-gray-800"
+              title="Generate a new name"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
         </label>
       )}
       <label className="flex flex-col gap-1 text-sm">

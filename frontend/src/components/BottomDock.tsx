@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Server, TerminalSquare, X } from 'lucide-react'
+import { ScrollText, TerminalSquare, X } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { listProfiles } from '../api/auth'
@@ -8,9 +8,9 @@ import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 import { CliPanel } from './CliPanel'
 import { EndpointDialog } from './EndpointDialog'
-import { LogsPanel } from './LogsPanel'
+import { InspectorPanel } from './InspectorPanel'
 
-type Panel = 'cli' | 'logs' | null
+type Panel = 'cli' | 'inspector' | null
 
 export function BottomDock() {
   const { profile: profileParam } = useParams()
@@ -78,7 +78,7 @@ export function BottomDock() {
             title="Drag to resize"
           />
           <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
-            <span>{panel === 'cli' ? 'CLI' : 'Response logs'}</span>
+            <span>{panel === 'cli' ? 'CLI' : 'Inspector'}</span>
             <button
               type="button"
               onClick={() => setPanel(null)}
@@ -89,7 +89,7 @@ export function BottomDock() {
             </button>
           </div>
           <div className="h-[calc(100%-1.75rem)]">
-            {panel === 'cli' ? <CliPanel /> : <LogsPanel />}
+            {panel === 'cli' ? <CliPanel /> : <InspectorPanel />}
           </div>
         </div>
       )}
@@ -101,9 +101,13 @@ export function BottomDock() {
             <TerminalSquare className="h-3.5 w-3.5" />
             CLI
           </button>
-          <button type="button" onClick={() => toggle('logs')} className={btn(panel === 'logs')}>
-            <Server className="h-3.5 w-3.5" />
-            Response logs
+          <button
+            type="button"
+            onClick={() => toggle('inspector')}
+            className={btn(panel === 'inspector')}
+          >
+            <ScrollText className="h-3.5 w-3.5" />
+            Inspector
           </button>
         </div>
 

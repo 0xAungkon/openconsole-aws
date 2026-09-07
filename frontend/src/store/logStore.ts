@@ -3,13 +3,22 @@ import { create } from 'zustand'
 export interface LogEntry {
   id: string
   ts: number
-  service: string
-  operation: string
-  params: Record<string, unknown>
+  /** 'gui' = a proxied action from the UI; 'cli' = typed in the terminal. */
+  source: 'gui' | 'cli'
+  /** Copy-pasteable AWS CLI command equivalent to this call. */
+  command: string
   status: 'ok' | 'error'
   durationMs: number
+  // GUI (proxy) calls
+  service?: string
+  operation?: string
+  params?: Record<string, unknown>
   result?: unknown
   error?: { code: string; message: string }
+  // CLI runs
+  stdout?: string
+  stderr?: string
+  exitCode?: number
 }
 
 interface LogState {

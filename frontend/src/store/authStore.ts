@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type { GuestCreds, Mode, User } from '../types'
 
 interface AuthState {
@@ -42,6 +42,16 @@ export const useAuthStore = create<AuthState>()(
       reset: () =>
         set({ mode: null, token: null, user: null, guestCreds: null }),
     }),
-    { name: 'aws-openconsole-auth' },
+    {
+      name: 'aws-openconsole-auth',
+      storage: createJSONStorage(() => localStorage),
+      // Persist only the session data (never the action functions).
+      partialize: (s) => ({
+        mode: s.mode,
+        token: s.token,
+        user: s.user,
+        guestCreds: s.guestCreds,
+      }),
+    },
   ),
 )

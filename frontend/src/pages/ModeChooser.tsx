@@ -1,11 +1,16 @@
 import { Hexagon, Lock, Rocket } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { BRAND_BADGE, BRAND_NAME } from '../brand'
 import { useAuthStore } from '../store/authStore'
 
 export function ModeChooser() {
   const navigate = useNavigate()
-  const enterGuestMode = useAuthStore((s) => s.enterGuestMode)
+  const { mode, token, guestCreds, enterGuestMode } = useAuthStore()
+
+  // Already signed in? Skip the chooser and go to the workspace.
+  if (mode === 'register' && token) return <Navigate to="/onboarding" replace />
+  if (mode === 'guest' && guestCreds) return <Navigate to="/guest" replace />
+
   return (
     <div className="flex min-h-full items-center justify-center p-6">
       <div className="w-full max-w-2xl">

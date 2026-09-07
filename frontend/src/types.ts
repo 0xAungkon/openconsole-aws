@@ -48,6 +48,8 @@ export interface ActionField {
   required?: boolean
   placeholder?: string
   help?: string
+  /** Prefilled value for the input (e.g. a sensible default instance type). */
+  default?: string
 }
 
 export interface Column {

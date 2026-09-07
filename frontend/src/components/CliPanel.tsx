@@ -1,25 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
-import { AwsProxyError, runQuery } from '../api/proxy'
+import { runCli } from '../api/cli'
 
 interface Line {
   kind: 'cmd' | 'out' | 'err' | 'info'
   text: string
 }
 
-const HELP = `Usage: [aws] <service> <operation> [json-params]
+const HELP = `AWS CLI terminal — only "aws" commands are allowed.
 Examples:
-  s3 list_buckets
-  ec2 describe_instances
-  dynamodb list_tables
-  s3 list_objects_v2 {"Bucket":"my-bucket"}
-Commands: help, clear`
+  aws s3 ls
+  aws s3api list-buckets
+  aws ec2 describe-instances
+  aws lambda list-functions
+  aws iam list-users
+Region and endpoint are applied automatically from your session.
+Local commands: help, clear`
 
 export function CliPanel() {
   const [lines, setLines] = useState<Line[]>([
-    { kind: 'info', text: 'Type "help" to get started.' },
+    { kind: 'info', text: 'AWS CLI terminal. Type "help" to get started.' },
   ])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [history, setHistory] = useState<string[]>([])
+  const [histIdx, setHistIdx] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -33,6 +37,8 @@ export function CliPanel() {
   async function run(raw: string) {
     const cmd = raw.trim()
     if (!cmd) return
+    setHistory((h) => [...h, cmd])
+    setHistIdx(null)
     push({ kind: 'cmd', text: `$ ${cmd}` })
 
     if (cmd === 'clear') {
@@ -43,40 +49,52 @@ export function CliPanel() {
       push({ kind: 'info', text: HELP })
       return
     }
-
-    let tokens = cmd.split(/\s+/)
-    if (tokens[0] === 'aws') tokens = tokens.slice(1)
-    const [service, operation, ...rest] = tokens
-    if (!service || !operation) {
-      push({ kind: 'err', text: 'Expected: <service> <operation> [json-params]' })
+    if (!/^aws(\s|$)/.test(cmd)) {
+      push({
+        kind: 'err',
+        text: "Only 'aws' commands are allowed here. Try `aws s3 ls`. Type 'help' for examples.",
+      })
       return
-    }
-
-    let params: Record<string, unknown> = {}
-    const jsonStr = cmd.slice(cmd.indexOf(operation) + operation.length).trim()
-    if (rest.length && jsonStr) {
-      try {
-        params = JSON.parse(jsonStr)
-      } catch {
-        push({ kind: 'err', text: 'Params must be valid JSON' })
-        return
-      }
     }
 
     setBusy(true)
     try {
-      const result = await runQuery(service, operation, params)
-      push({ kind: 'out', text: JSON.stringify(result, null, 2) })
+      const res = await runCli(cmd)
+      const out = res.stdout.replace(/\n+$/, '')
+      const err = res.stderr.replace(/\n+$/, '')
+      if (out) push({ kind: 'out', text: out })
+      if (err) push({ kind: res.ok ? 'info' : 'err', text: err })
+      if (!out && !err) {
+        push({
+          kind: 'info',
+          text: res.ok ? '(no output)' : `exited with code ${res.exit_code}`,
+        })
+      }
     } catch (err) {
-      const msg =
-        err instanceof AwsProxyError
-          ? `${err.code}: ${err.message}`
-          : err instanceof Error
-            ? err.message
-            : String(err)
-      push({ kind: 'err', text: msg })
+      push({ kind: 'err', text: err instanceof Error ? err.message : String(err) })
     } finally {
       setBusy(false)
+    }
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (history.length === 0) return
+      const idx = histIdx === null ? history.length - 1 : Math.max(0, histIdx - 1)
+      setHistIdx(idx)
+      setInput(history[idx])
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (histIdx === null) return
+      const idx = histIdx + 1
+      if (idx >= history.length) {
+        setHistIdx(null)
+        setInput('')
+      } else {
+        setHistIdx(idx)
+        setInput(history[idx])
+      }
     }
   }
 
@@ -114,9 +132,11 @@ export function CliPanel() {
           autoFocus
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="s3 list_buckets"
+          onKeyDown={onKeyDown}
+          placeholder="aws s3 ls"
           spellCheck={false}
-          className="flex-1 bg-transparent text-gray-100 placeholder-gray-600 focus:outline-none"
+          disabled={busy}
+          className="flex-1 bg-transparent text-gray-100 placeholder-gray-600 focus:outline-none disabled:opacity-60"
         />
       </form>
     </div>
