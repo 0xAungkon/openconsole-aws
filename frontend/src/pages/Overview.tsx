@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { runQuery } from '../api/proxy'
 import { Card } from '../components/Card'
 import { GaugeRing } from '../components/GaugeRing'
@@ -10,54 +10,55 @@ import { StatCounter } from '../components/StatCounter'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
-function useCount(
-  key: string,
-  service: string,
-  operation: string,
-  extract: (r: any) => number,
-  enabled: boolean,
-) {
-  return useQuery({
-    queryKey: ['count', key, useSessionStore.getState().region],
-    queryFn: async () => extract(await runQuery(service, operation)),
-    enabled,
-    retry: false,
-    staleTime: 30_000,
-  })
-}
-
-export function Dashboard() {
+export function Overview() {
   const navigate = useNavigate()
+  const { profile } = useParams()
   const mode = useAuthStore((s) => s.mode)
+  const guestCreds = useAuthStore((s) => s.guestCreds)
   const region = useSessionStore((s) => s.region)
   const activeProfileId = useSessionStore((s) => s.activeProfileId)
 
-  const enabled = mode === 'guest' || activeProfileId != null
+  const enabled = mode === 'guest' ? !!guestCreds : activeProfileId != null
 
-  const buckets = useCount('s3', 's3', 'list_buckets', (r) => r.Buckets?.length ?? 0, enabled)
-  const functions = useCount('lambda', 'lambda', 'list_functions', (r) => r.Functions?.length ?? 0, enabled)
-  const users = useCount('iam', 'iam', 'list_users', (r) => r.Users?.length ?? 0, enabled)
-  const dbs = useCount('rds', 'rds', 'describe_db_instances', (r) => r.DBInstances?.length ?? 0, enabled)
+  const count = (key: string, service: string, op: string, extract: (r: any) => number) =>
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useQuery({
+      queryKey: ['count', key, profile, region],
+      queryFn: async () => extract(await runQuery<any>(service, op)),
+      enabled,
+      retry: false,
+      staleTime: 30_000,
+    })
 
-  const instances = useQuery({
-    queryKey: ['count', 'ec2', region],
-    queryFn: () => runQuery<any>('ec2', 'describe_instances'),
+  const instances = count('ec2', 'ec2', 'describe_instances', (r) =>
+    (r.Reservations ?? []).reduce((n: number, x: any) => n + (x.Instances?.length ?? 0), 0),
+  )
+  const buckets = count('s3', 's3', 'list_buckets', (r) => r.Buckets?.length ?? 0)
+  const functions = count('lambda', 'lambda', 'list_functions', (r) => r.Functions?.length ?? 0)
+  const users = count('iam', 'iam', 'list_users', (r) => r.Users?.length ?? 0)
+  const dbs = count('rds', 'rds', 'describe_db_instances', (r) => r.DBInstances?.length ?? 0)
+  const tables = count('dynamodb', 'dynamodb', 'list_tables', (r) => r.TableNames?.length ?? 0)
+
+  const runningQuery = useQuery({
+    queryKey: ['ec2-running', profile, region],
+    queryFn: async () => {
+      const r = await runQuery<any>('ec2', 'describe_instances')
+      const all = (r.Reservations ?? []).flatMap((x: any) => x.Instances ?? [])
+      return {
+        total: all.length,
+        running: all.filter((i: any) => i.State?.Name === 'running').length,
+      }
+    },
     enabled,
     retry: false,
     staleTime: 30_000,
   })
 
-  const allInstances =
-    instances.data?.Reservations?.flatMap((r: any) => r.Instances ?? []) ?? []
-  const running = allInstances.filter((i: any) => i.State?.Name === 'running').length
-  const totalInst = allInstances.length
-
   const val = (q: { data?: number; isError: boolean; isLoading: boolean }) =>
-    q.isLoading ? '…' : q.isError ? '—' : (q.data ?? 0)
+    !enabled ? '—' : q.isLoading ? '…' : q.isError ? '—' : (q.data ?? 0)
 
-  // Placeholder monitoring series (real CloudWatch wiring is a follow-up).
   const [series] = useState(() =>
-    Array.from({ length: 24 }, (_, i) => 40 + Math.sin(i / 2) * 20 + Math.random() * 10),
+    Array.from({ length: 24 }, (_, i) => 40 + Math.sin(i / 2) * 18 + Math.random() * 8),
   )
 
   const [memo, setMemo] = useState('')
@@ -65,24 +66,24 @@ export function Dashboard() {
     setMemo(localStorage.getItem('aws-openconsole-memo') ?? '')
   }, [])
 
+  const running = runningQuery.data?.running ?? 0
+  const totalInst = runningQuery.data?.total ?? 0
+
   return (
     <div className="grid gap-4 xl:grid-cols-3">
       <div className="flex flex-col gap-4 xl:col-span-2">
         <Card title="Account summary">
-          <div className="flex flex-wrap justify-between gap-2">
-            <StatCounter
-              label="EC2 instances"
-              value={instances.isLoading ? '…' : instances.isError ? '—' : totalInst}
-              onClick={() => navigate('/app/ec2')}
-            />
-            <StatCounter label="S3 buckets" value={val(buckets)} onClick={() => navigate('/app/s3')} />
-            <StatCounter label="Lambda fns" value={val(functions)} onClick={() => navigate('/app/lambda')} />
-            <StatCounter label="IAM users" value={val(users)} onClick={() => navigate('/app/iam')} />
-            <StatCounter label="RDS instances" value={val(dbs)} onClick={() => navigate('/app/rds')} />
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            <StatCounter label="EC2" value={val(instances)} onClick={() => navigate(`/${profile}/ec2`)} />
+            <StatCounter label="S3" value={val(buckets)} onClick={() => navigate(`/${profile}/s3`)} />
+            <StatCounter label="Lambda" value={val(functions)} onClick={() => navigate(`/${profile}/lambda`)} />
+            <StatCounter label="IAM" value={val(users)} onClick={() => navigate(`/${profile}/iam`)} />
+            <StatCounter label="RDS" value={val(dbs)} onClick={() => navigate(`/${profile}/rds`)} />
+            <StatCounter label="DynamoDB" value={val(tables)} onClick={() => navigate(`/${profile}/dynamodb`)} />
           </div>
           {!enabled && (
             <p className="mt-2 text-xs text-amber-600">
-              Select an AWS profile in the top bar to load live counts.
+              Connect a profile to load live counts.
             </p>
           )}
         </Card>
@@ -99,13 +100,19 @@ export function Dashboard() {
               label="S3 buckets"
               fraction={Math.min(1, (buckets.data ?? 0) / 20)}
               centerText={String(buckets.data ?? 0)}
-              caption="of 20 shown"
+              caption="buckets"
             />
             <GaugeRing
               label="Lambda"
               fraction={Math.min(1, (functions.data ?? 0) / 20)}
               centerText={String(functions.data ?? 0)}
               caption="functions"
+            />
+            <GaugeRing
+              label="DynamoDB"
+              fraction={Math.min(1, (tables.data ?? 0) / 20)}
+              centerText={String(tables.data ?? 0)}
+              caption="tables"
             />
           </div>
         </Card>

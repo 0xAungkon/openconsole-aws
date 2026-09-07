@@ -1,9 +1,10 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { CATALOG } from '../services/catalog'
 
 /** 1Panel "Application"-list style: scrollable service rows with a primary action. */
 export function ResourceList() {
   const navigate = useNavigate()
+  const { profile } = useParams()
   return (
     <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
       {CATALOG.map((s) => (
@@ -19,7 +20,7 @@ export function ResourceList() {
           </div>
           <button
             type="button"
-            onClick={() => navigate(`/app/${s.key}`)}
+            onClick={() => navigate(`/${profile}/${s.key}`)}
             className="rounded-md border border-brand-200 px-3 py-1 text-xs font-medium text-brand-600 transition hover:bg-brand-50 dark:border-gray-700 dark:text-brand-300 dark:hover:bg-gray-800"
           >
             Open

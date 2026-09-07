@@ -25,7 +25,8 @@ export function AuthPage({ initialTab = 'login' }: { initialTab?: 'login' | 'reg
           ? await register(name, email, password)
           : await login(email, password)
       setRegister(data.access_token, data.user)
-      navigate('/app')
+      // Onboarding resolves to the first profile, or prompts to create one.
+      navigate('/onboarding')
     } catch (err) {
       // surface the backend's detail message when present
       const detail = (err as any)?.response?.data?.detail

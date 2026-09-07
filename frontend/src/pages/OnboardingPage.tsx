@@ -2,11 +2,13 @@ import { useQuery } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { listProfiles } from '../api/auth'
 import { ProfileForm } from '../components/ProfileForm'
+import { slugify } from '../lib/slug'
 import { useAuthStore } from '../store/authStore'
 
 /**
- * First-run onboarding for register-mode users with no stored profile.
- * A dedicated centered page (same layout as guest/login), not a modal.
+ * First-run onboarding / post-login resolver for register mode. If the user has
+ * profiles, it redirects to the first one's URL; otherwise it shows a dedicated
+ * page (same layout as guest/login) to create the first profile.
  */
 export function OnboardingPage() {
   const navigate = useNavigate()
@@ -18,10 +20,20 @@ export function OnboardingPage() {
     enabled: mode === 'register',
   })
 
-  // Guests never onboard; users who already have a profile skip straight in.
-  if (mode !== 'register') return <Navigate to="/app" replace />
-  if (profiles.isSuccess && profiles.data.length > 0)
-    return <Navigate to="/app" replace />
+  if (mode !== 'register') return <Navigate to="/" replace />
+
+  if (profiles.isLoading) {
+    return (
+      <div className="flex min-h-full items-center justify-center text-sm text-gray-400">
+        Loading…
+      </div>
+    )
+  }
+
+  // Already has a profile → go straight to it.
+  if (profiles.data && profiles.data.length > 0) {
+    return <Navigate to={`/${slugify(profiles.data[0].label)}`} replace />
+  }
 
   return (
     <div className="flex min-h-full items-center justify-center p-6">
@@ -37,7 +49,9 @@ export function OnboardingPage() {
         <div className="mt-4">
           <ProfileForm
             submitLabel="Create profile"
-            onSuccess={() => navigate('/app', { replace: true })}
+            onSuccess={(created) =>
+              navigate(`/${slugify(created.label)}`, { replace: true })
+            }
           />
         </div>
 

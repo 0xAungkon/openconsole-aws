@@ -6,7 +6,6 @@ import { ActionForm } from '../components/ActionForm'
 import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
 import { ErrorAlert } from '../components/ErrorAlert'
-import { JsonInspector } from '../components/JsonInspector'
 import { getService } from '../services/catalog'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
@@ -74,8 +73,7 @@ export function ServicePage() {
       >
         {needsProfile ? (
           <p className="text-sm text-amber-600">
-            Select an AWS profile in the top bar (or add one under Profiles) to
-            run queries.
+            Select an AWS profile from the account menu to run queries.
           </p>
         ) : (
           action && (
@@ -92,18 +90,12 @@ export function ServicePage() {
         <Card title="Results">
           {run.isError ? (
             <ErrorAlert error={run.error} />
+          ) : action?.kind === 'list' && action.getRows && action.columns ? (
+            <DataTable columns={action.columns} rows={action.getRows(run.data)} />
           ) : (
-            <>
-              {action?.kind === 'list' && action.getRows && action.columns ? (
-                <DataTable
-                  columns={action.columns}
-                  rows={action.getRows(run.data)}
-                />
-              ) : (
-                <p className="text-sm text-green-600">Request succeeded.</p>
-              )}
-              <JsonInspector value={run.data} defaultOpen={action?.kind !== 'list'} />
-            </>
+            <p className="text-sm text-green-600">
+              Request succeeded — full response is available in Response logs.
+            </p>
           )}
         </Card>
       )}

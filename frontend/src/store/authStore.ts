@@ -10,6 +10,7 @@ interface AuthState {
   // guest mode
   guestCreds: GuestCreds | null
 
+  enterGuestMode: () => void
   setGuest: (creds: GuestCreds) => void
   setRegister: (token: string, user: User) => void
   updateGuestCreds: (patch: Partial<GuestCreds>) => void
@@ -23,6 +24,9 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       user: null,
       guestCreds: null,
+
+      enterGuestMode: () =>
+        set({ mode: 'guest', token: null, user: null }),
 
       setGuest: (creds) =>
         set({ mode: 'guest', guestCreds: creds, token: null, user: null }),

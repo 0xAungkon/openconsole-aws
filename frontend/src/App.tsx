@@ -2,19 +2,20 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './pages/AppLayout'
 import { AuthPage } from './pages/AuthPage'
-import { Dashboard } from './pages/Dashboard'
-import { GuestCredentials } from './pages/GuestCredentials'
 import { ModeChooser } from './pages/ModeChooser'
+import { NotFound } from './pages/NotFound'
 import { OnboardingPage } from './pages/OnboardingPage'
-import { ProfilesPage } from './pages/ProfilesPage'
+import { Overview } from './pages/Overview'
 import { ServicePage } from './pages/ServicePage'
+import { SettingsPage } from './pages/SettingsPage'
 import { useAuthStore } from './store/authStore'
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { mode, token, guestCreds } = useAuthStore()
-  if (mode === 'guest' && guestCreds) return <>{children}</>
+  const { mode, token } = useAuthStore()
+  // Guest mode is allowed even before credentials exist — the layout shows the
+  // connect gate. Register mode requires a token.
+  if (mode === 'guest') return <>{children}</>
   if (mode === 'register' && token) return <>{children}</>
-  if (mode === 'guest') return <Navigate to="/guest" replace />
   return <Navigate to="/" replace />
 }
 
@@ -22,7 +23,6 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<ModeChooser />} />
-      <Route path="/guest" element={<GuestCredentials />} />
       <Route path="/login" element={<AuthPage initialTab="login" />} />
       <Route path="/register" element={<AuthPage initialTab="register" />} />
 
@@ -36,19 +36,19 @@ export default function App() {
       />
 
       <Route
-        path="/app"
+        path="/:profile"
         element={
           <RequireAuth>
             <AppLayout />
           </RequireAuth>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="profiles" element={<ProfilesPage />} />
+        <Route index element={<Overview />} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path=":service" element={<ServicePage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }

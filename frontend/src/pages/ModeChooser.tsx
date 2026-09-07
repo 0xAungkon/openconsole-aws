@@ -1,15 +1,18 @@
 import { Hexagon, Lock, Rocket } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { BRAND_BADGE, BRAND_NAME } from '../brand'
+import { useAuthStore } from '../store/authStore'
 
 export function ModeChooser() {
   const navigate = useNavigate()
+  const enterGuestMode = useAuthStore((s) => s.enterGuestMode)
   return (
     <div className="flex min-h-full items-center justify-center p-6">
       <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
           <Hexagon className="mx-auto h-10 w-10 text-brand-500" />
           <h1 className="mt-2 text-2xl font-semibold text-gray-800 dark:text-gray-100">
-            AWS OpenConsole
+            {BRAND_BADGE} {BRAND_NAME}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             Manage AWS services through a friendly interface.
@@ -19,7 +22,10 @@ export function ModeChooser() {
         <div className="grid gap-4 sm:grid-cols-2">
           <button
             type="button"
-            onClick={() => navigate('/guest')}
+            onClick={() => {
+              enterGuestMode()
+              navigate('/guest')
+            }}
             className="rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
           >
             <Rocket className="h-6 w-6 text-brand-500" />

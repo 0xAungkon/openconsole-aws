@@ -1,34 +1,47 @@
 import {
   Hexagon,
   Home,
-  Lock,
+  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings,
   type LucideIcon,
 } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate, useParams } from 'react-router-dom'
+import { BRAND_BADGE, BRAND_NAME } from '../brand'
 import { CATALOG } from '../services/catalog'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
-interface SidebarProps {
-  onEndpointClick: () => void
-}
+export function Sidebar() {
+  const { profile } = useParams()
+  const navigate = useNavigate()
+  const { sidebarCollapsed, toggleSidebar } = useSessionStore()
+  const reset = useAuthStore((s) => s.reset)
 
-export function Sidebar({ onEndpointClick }: SidebarProps) {
-  const { sidebarCollapsed, toggleSidebar, endpointUrl } = useSessionStore()
-  const mode = useAuthStore((s) => s.mode)
-
-  const navItems: { key: string; label: string; icon: LucideIcon; end: boolean }[] = [
-    { key: '', label: 'Overview', icon: Home, end: true },
-    ...CATALOG.map((s) => ({ key: s.key, label: s.label, icon: s.icon, end: false })),
-    ...(mode === 'register'
-      ? [{ key: 'profiles', label: 'Profiles', icon: Lock, end: false }]
-      : []),
+  const base = `/${profile ?? ''}`
+  const navItems: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
+    { to: base, label: 'Overview', icon: Home, end: true },
+    ...CATALOG.map((s) => ({
+      to: `${base}/${s.key}`,
+      label: s.label,
+      icon: s.icon,
+      end: false,
+    })),
   ]
 
-  const linkBase =
-    'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition'
+  const linkBase = 'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition'
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    `${linkBase} ${
+      isActive
+        ? 'bg-brand-50 font-medium text-brand-700 dark:bg-gray-800 dark:text-brand-300'
+        : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
+    }`
+
+  function logout() {
+    reset()
+    navigate('/')
+  }
 
   return (
     <aside
@@ -39,14 +52,15 @@ export function Sidebar({ onEndpointClick }: SidebarProps) {
       <div className="flex items-center justify-between px-3 py-4">
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2">
-            <Hexagon className="h-5 w-5 text-brand-500" />
-            <span className="text-sm font-semibold leading-tight text-gray-800 dark:text-gray-100">
-              AWS
-              <br />
-              OpenConsole
+            <span className="rounded-md bg-brand-500 px-1.5 py-0.5 text-xs font-bold text-white">
+              {BRAND_BADGE}
+            </span>
+            <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+              {BRAND_NAME}
             </span>
           </div>
         )}
+        {sidebarCollapsed && <Hexagon className="h-5 w-5 text-brand-500" />}
         <button
           type="button"
           onClick={toggleSidebar}
@@ -63,42 +77,28 @@ export function Sidebar({ onEndpointClick }: SidebarProps) {
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-2">
         {navItems.map((item) => (
-          <NavLink
-            key={item.key || 'overview'}
-            to={item.key ? `/app/${item.key}` : '/app'}
-            end={item.end}
-            className={({ isActive }) =>
-              `${linkBase} ${
-                isActive
-                  ? 'bg-brand-50 font-medium text-brand-700 dark:bg-gray-800 dark:text-brand-300'
-                  : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
-              }`
-            }
-            title={item.label}
-          >
+          <NavLink key={item.to} to={item.to} end={item.end} className={linkClass} title={item.label}>
             <item.icon className="h-4 w-4 shrink-0" />
             {!sidebarCollapsed && <span>{item.label}</span>}
           </NavLink>
         ))}
       </nav>
 
-      <button
-        type="button"
-        onClick={onEndpointClick}
-        className="m-2 flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-left text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800"
-        title="Configure endpoint"
-      >
-        <span
-          className={`h-2 w-2 shrink-0 rounded-full ${
-            endpointUrl ? 'bg-amber-500' : 'bg-green-500'
-          }`}
-        />
-        {!sidebarCollapsed && (
-          <span className="truncate">
-            {endpointUrl ? endpointUrl : 'AWS (default endpoint)'}
-          </span>
-        )}
-      </button>
+      <div className="space-y-1 border-t border-gray-100 px-2 py-2 dark:border-gray-800">
+        <NavLink to={`${base}/settings`} className={linkClass} title="Settings">
+          <Settings className="h-4 w-4 shrink-0" />
+          {!sidebarCollapsed && <span>Settings</span>}
+        </NavLink>
+        <button
+          type="button"
+          onClick={logout}
+          className={`${linkBase} w-full text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800`}
+          title="Log out"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          {!sidebarCollapsed && <span>Log out</span>}
+        </button>
+      </div>
     </aside>
   )
 }

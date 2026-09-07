@@ -1,4 +1,4 @@
-import { Database, KeyRound, Server, Boxes, Zap } from 'lucide-react'
+import { Database, KeyRound, Server, Boxes, Table2, Zap } from 'lucide-react'
 import type { Row, ServiceDef } from '../types'
 
 // Declarative source of truth for every service page. Adding a service or action
@@ -319,6 +319,39 @@ export const CATALOG: ServiceDef[] = [
             type: 'string',
             required: true,
           },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'dynamodb',
+    label: 'DynamoDB',
+    icon: Table2,
+    summary: 'NoSQL database tables',
+    actions: [
+      {
+        id: 'list_tables',
+        label: 'List tables',
+        kind: 'list',
+        fields: [],
+        getRows: (r) =>
+          (r?.TableNames ?? []).map((name: string): Row => ({ TableName: name })),
+        columns: [{ key: 'TableName', label: 'Table' }],
+      },
+      {
+        id: 'describe_table',
+        label: 'Describe table',
+        kind: 'mutation',
+        fields: [
+          { name: 'TableName', label: 'Table name', type: 'string', required: true },
+        ],
+      },
+      {
+        id: 'delete_table',
+        label: 'Delete table',
+        kind: 'mutation',
+        fields: [
+          { name: 'TableName', label: 'Table name', type: 'string', required: true },
         ],
       },
     ],

@@ -1,41 +1,72 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Outlet, useLocation, useParams } from 'react-router-dom'
 import { listProfiles } from '../api/auth'
-import { EndpointDialog } from '../components/EndpointDialog'
+import { BottomDock } from '../components/BottomDock'
 import { Sidebar } from '../components/Sidebar'
 import { TopBar } from '../components/TopBar'
 import { getService } from '../services/catalog'
+import { findProfileBySlug } from '../lib/slug'
 import { useAuthStore } from '../store/authStore'
+import { useSessionStore } from '../store/sessionStore'
+import { GuestCredentials } from './GuestCredentials'
+import { NotFound } from './NotFound'
 
 function titleFor(pathname: string): string {
-  const parts = pathname.split('/').filter(Boolean) // ['app', ...]
-  const seg = parts[1]
+  const seg = pathname.split('/').filter(Boolean)[1] // ['<profile>', <seg>]
   if (!seg) return 'Overview'
-  if (seg === 'profiles') return 'Profiles'
+  if (seg === 'settings') return 'Settings'
   return getService(seg)?.label ?? seg
 }
 
 export function AppLayout() {
+  const { profile: profileParam } = useParams()
   const location = useLocation()
-  const [endpointOpen, setEndpointOpen] = useState(false)
   const mode = useAuthStore((s) => s.mode)
+  const guestCreds = useAuthStore((s) => s.guestCreds)
+  const setActiveProfileId = useSessionStore((s) => s.setActiveProfileId)
+  const setRegion = useSessionStore((s) => s.setRegion)
 
-  // Register-mode onboarding: prompt for a first profile when none exist.
-  const profiles = useQuery({
+  const profilesQuery = useQuery({
     queryKey: ['profiles'],
     queryFn: listProfiles,
     enabled: mode === 'register',
   })
-  const needsOnboarding =
-    mode === 'register' && profiles.isSuccess && profiles.data.length === 0
 
-  // Register users without a profile are sent to the dedicated onboarding page.
-  if (needsOnboarding) return <Navigate to="/onboarding" replace />
+  const matched =
+    mode === 'register'
+      ? findProfileBySlug(profilesQuery.data ?? [], profileParam)
+      : undefined
+
+  // Keep the active profile + region in sync with the profile in the URL.
+  useEffect(() => {
+    if (matched) {
+      setActiveProfileId(matched.id)
+      setRegion(matched.default_region)
+    }
+  }, [matched, setActiveProfileId, setRegion])
+
+  // --- Guest mode ---
+  if (mode === 'guest') {
+    if (profileParam !== 'guest') return <NotFound />
+    if (!guestCreds) return <GuestCredentials />
+  }
+
+  // --- Register mode ---
+  if (mode === 'register') {
+    if (profilesQuery.isLoading) {
+      return (
+        <div className="flex h-full items-center justify-center text-sm text-gray-400">
+          Loading…
+        </div>
+      )
+    }
+    if (!matched) return <NotFound />
+  }
 
   return (
     <div className="flex h-full">
-      <Sidebar onEndpointClick={() => setEndpointOpen(true)} />
+      <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar title={titleFor(location.pathname)} />
@@ -44,13 +75,8 @@ export function AppLayout() {
           <Outlet />
         </main>
 
-        <footer className="flex items-center justify-between border-t border-gray-200 px-4 py-2 text-xs text-gray-400 dark:border-gray-800">
-          <span>© {new Date().getFullYear()} AWS OpenConsole</span>
-          <span>v0.1.0</span>
-        </footer>
+        <BottomDock />
       </div>
-
-      {endpointOpen && <EndpointDialog onClose={() => setEndpointOpen(false)} />}
     </div>
   )
 }

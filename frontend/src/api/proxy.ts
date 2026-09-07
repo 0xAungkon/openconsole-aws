@@ -1,5 +1,6 @@
 import type { ProxyError, ProxyResponse } from '../types'
 import { useAuthStore } from '../store/authStore'
+import { useLogStore } from '../store/logStore'
 import { useSessionStore } from '../store/sessionStore'
 import { api } from './client'
 
@@ -45,15 +46,37 @@ export async function runQuery<T = unknown>(
 
   // The proxy returns 200 for success and 4xx/5xx for AWS/validation errors,
   // both carrying a ProxyResponse body. Read the body regardless of status.
+  const started = performance.now()
   const res = await api.post<ProxyResponse<T>>('/api/proxy', body, {
     validateStatus: () => true,
   })
   const data = res.data
+  const durationMs = Math.round(performance.now() - started)
 
   if (!data || data.ok === false) {
-    if (data?.error) throw new AwsProxyError(data.error)
-    throw new Error(`Request failed with status ${res.status}`)
+    const error = data?.error ?? {
+      code: 'RequestError',
+      message: `Request failed with status ${res.status}`,
+    }
+    useLogStore.getState().add({
+      service,
+      operation,
+      params,
+      status: 'error',
+      durationMs,
+      error,
+    })
+    throw new AwsProxyError(error)
   }
+
+  useLogStore.getState().add({
+    service,
+    operation,
+    params,
+    status: 'ok',
+    durationMs,
+    result: data.result,
+  })
   return data.result as T
 }
 
