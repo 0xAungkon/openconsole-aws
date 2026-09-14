@@ -29,6 +29,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { runQuery } from '../api/proxy'
 import { Card } from '../components/Card'
 import { CodenameInput } from '../components/CodenameInput'
+import { generateCodename } from '../lib/codename'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DbStatusBadge } from '../components/DbStatusBadge'
 import { ErrorAlert } from '../components/ErrorAlert'
@@ -297,7 +298,7 @@ function DbRowView({ db, busy, onOpen, onAct }: { db: DbRow; busy: boolean; onOp
 /* ------------------------------------------------------------------ */
 
 function CreateDatabasePanel({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
-  const [id, setId] = useState('')
+  const [id, setId] = useState(generateCodename)
   const [engine, setEngine] = useState(ENGINES[0].id)
   const [klass, setKlass] = useState('db.t3.micro')
   const [storage, setStorage] = useState('20')

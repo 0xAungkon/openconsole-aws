@@ -30,6 +30,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { runQuery } from '../api/proxy'
 import { Card } from '../components/Card'
 import { CodenameInput } from '../components/CodenameInput'
+import { generateCodename } from '../lib/codename'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { RoleInput } from '../components/RoleInput'
@@ -311,7 +312,7 @@ function FunctionRowView({ fn, busy, onOpen, onDelete }: { fn: FunctionRow; busy
 /* ------------------------------------------------------------------ */
 
 function CreateFunctionPanel({ onClose, onCreated }: { onClose: () => void; onCreated: (name: string) => void }) {
-  const [name, setName] = useState('')
+  const [name, setName] = useState(generateCodename)
   const [runtimeId, setRuntimeId] = useState(RUNTIMES[0].id)
   const runtime = RUNTIMES.find((r) => r.id === runtimeId)!
   const [code, setCode] = useState(runtime.inline?.template ?? '')
