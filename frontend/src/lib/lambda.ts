@@ -12,6 +12,7 @@ export interface FunctionRow {
   Description: string
   LastModified: string
   State: string
+  StateReason: string
   Version: string
   Environment?: { Variables?: Record<string, string> }
   _raw: any
@@ -34,6 +35,7 @@ export function toRow(f: any): FunctionRow {
     Description: f.Description ?? '',
     LastModified: f.LastModified ?? '',
     State: f.State ?? 'Active',
+    StateReason: f.StateReason ?? f.StateReasonCode ?? '',
     Version: f.Version ?? '$LATEST',
     Environment: f.Environment,
     _raw: f,

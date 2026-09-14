@@ -11,6 +11,7 @@ persisted or logged here.
 
 import base64
 import datetime as dt
+import urllib.request
 from decimal import Decimal
 from typing import Any
 
@@ -151,3 +152,49 @@ def run_query(
     if isinstance(result, dict):
         result.pop("ResponseMetadata", None)
     return result
+
+
+# Deployment packages larger than this are not returned for in-browser editing.
+MAX_LAMBDA_PACKAGE_BYTES = 10 * 1024 * 1024
+
+
+def fetch_lambda_package(
+    *,
+    function_name: str,
+    region: str,
+    endpoint_url: str | None,
+    credentials: InlineCredentials,
+) -> bytes:
+    """Download a function's current deployment package via the presigned URL
+    that ``get_function`` returns. The URL comes from AWS, not the client."""
+    result = run_query(
+        service="lambda",
+        operation="get_function",
+        region=region,
+        params={"FunctionName": function_name},
+        endpoint_url=endpoint_url,
+        credentials=credentials,
+    )
+    location = (result.get("Code") or {}).get("Location") if isinstance(result, dict) else None
+    if not location or not str(location).startswith(("http://", "https://")):
+        raise ProxyExecutionError(
+            ProxyError(code="NoPackage", message="This function has no downloadable deployment package."),
+            status_code=404,
+        )
+    try:
+        with urllib.request.urlopen(str(location), timeout=30) as resp:  # noqa: S310 - URL issued by AWS
+            data = resp.read(MAX_LAMBDA_PACKAGE_BYTES + 1)
+    except Exception as exc:
+        raise ProxyExecutionError(
+            ProxyError(code="PackageFetchError", message=f"Could not download the package: {exc}"),
+            status_code=502,
+        )
+    if len(data) > MAX_LAMBDA_PACKAGE_BYTES:
+        raise ProxyExecutionError(
+            ProxyError(
+                code="PackageTooLarge",
+                message=f"The package is larger than {MAX_LAMBDA_PACKAGE_BYTES // (1024 * 1024)} MB; download it instead.",
+            ),
+            status_code=413,
+        )
+    return data

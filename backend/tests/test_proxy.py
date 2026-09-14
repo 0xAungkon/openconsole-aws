@@ -155,3 +155,59 @@ def test_proxy_rejects_invalid_base64(client):
     )
     assert r.status_code == 400
     assert r.json()["error"]["code"] == "InvalidRequest"
+
+
+@mock_aws
+def test_lambda_code_fetches_package_from_aws_location(client, monkeypatch):
+    """The package is downloaded from the URL AWS returns, never a client URL."""
+    import base64
+    import io
+    import zipfile
+
+    from app.services import aws_proxy
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("index.py", "def handler(event, context):\n    return 'ok'\n")
+    package = buf.getvalue()
+
+    iam = boto3.client("iam", region_name="us-east-1")
+    role = iam.create_role(RoleName="r", AssumeRolePolicyDocument="{}")["Role"]["Arn"]
+    boto3.client("lambda", region_name="us-east-1").create_function(
+        FunctionName="fn", Runtime="python3.12", Role=role, Handler="index.handler",
+        Code={"ZipFile": package},
+    )
+
+    seen: dict[str, str] = {}
+
+    class _Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_urlopen(url, timeout=0):
+        seen["url"] = url
+        return _Resp(package)
+
+    monkeypatch.setattr(aws_proxy.urllib.request, "urlopen", fake_urlopen)
+    r = client.post(
+        "/api/proxy/lambda-code",
+        json={"function_name": "fn", "region": "us-east-1", "credentials": GUEST_CREDS},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert base64.b64decode(body["zip_base64"]) == package
+    assert seen["url"].startswith("http")  # came from get_function's Code.Location
+
+
+@mock_aws
+def test_lambda_code_unknown_function(client):
+    r = client.post(
+        "/api/proxy/lambda-code",
+        json={"function_name": "missing", "region": "us-east-1", "credentials": GUEST_CREDS},
+    )
+    assert r.status_code == 400
+    assert r.json()["ok"] is False

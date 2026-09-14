@@ -5,6 +5,8 @@ import { AuthPage } from './pages/AuthPage'
 import { BucketPage } from './pages/BucketPage'
 import { Ec2InstancePage } from './pages/Ec2InstancePage'
 import { Ec2Page } from './pages/Ec2Page'
+import { FunctionPage } from './pages/FunctionPage'
+import { FunctionsPage } from './pages/FunctionsPage'
 import { ModeChooser } from './pages/ModeChooser'
 import { NotFound } from './pages/NotFound'
 import { OnboardingPage } from './pages/OnboardingPage'
@@ -57,6 +59,8 @@ export default function App() {
         <Route path="compute/:instanceId" element={<Ec2InstancePage />} />
         <Route path="storage" element={<StoragePage />} />
         <Route path="storage/:bucket" element={<BucketPage />} />
+        <Route path="functions" element={<FunctionsPage />} />
+        <Route path="functions/:name" element={<FunctionPage />} />
         <Route path=":service" element={<ServicePage />} />
       </Route>
 

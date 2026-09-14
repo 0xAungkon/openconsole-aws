@@ -129,3 +129,36 @@ export async function testConnection(input: TestConnectionInput): Promise<void> 
     throw new Error(`Connection test failed with status ${res.status}`)
   }
 }
+
+/**
+ * Fetch a Lambda function's deployment package (zip, base64) through the
+ * backend, which downloads the presigned URL returned by get_function.
+ */
+export async function fetchLambdaPackage(functionName: string): Promise<{ zipBase64: string; size: number }> {
+  const { mode, guestCreds } = useAuthStore.getState()
+  const { region, endpointUrl, activeProfileId } = useSessionStore.getState()
+  const body: Record<string, unknown> = { function_name: functionName, region }
+  if (mode === 'guest') {
+    if (!guestCreds) throw new Error('No guest credentials configured')
+    body.region = guestCreds.region || region
+    body.endpoint_url = guestCreds.endpointUrl || endpointUrl || undefined
+    body.credentials = {
+      access_key_id: guestCreds.accessKeyId,
+      secret_access_key: guestCreds.secretAccessKey,
+      session_token: guestCreds.sessionToken || undefined,
+    }
+  } else {
+    if (activeProfileId == null) throw new Error('No AWS profile selected')
+    body.profile_id = activeProfileId
+    if (endpointUrl) body.endpoint_url = endpointUrl
+  }
+  const res = await api.post<{ ok: boolean; zip_base64?: string; size: number; error?: ProxyError }>(
+    '/api/proxy/lambda-code',
+    body,
+    { validateStatus: () => true },
+  )
+  if (!res.data?.ok || !res.data.zip_base64) {
+    throw new AwsProxyError(res.data?.error ?? { code: 'RequestError', message: `Request failed with status ${res.status}` })
+  }
+  return { zipBase64: res.data.zip_base64, size: res.data.size }
+}

@@ -37,3 +37,25 @@ class ProxyResponse(BaseModel):
     ok: bool
     result: Any | None = None
     error: ProxyError | None = None
+
+
+class LambdaCodeRequest(BaseModel):
+    """Fetch a function's deployment package (zip) on the server side.
+
+    Browsers can't read the presigned ``Code.Location`` URL (no CORS), so the
+    backend calls ``get_function`` itself and downloads the URL *AWS returned*
+    — never a client-supplied one.
+    """
+
+    function_name: str = Field(min_length=1)
+    region: str = "us-east-1"
+    endpoint_url: str | None = None
+    credentials: InlineCredentials | None = None
+    profile_id: int | None = None
+
+
+class LambdaCodeResponse(BaseModel):
+    ok: bool
+    zip_base64: str | None = None
+    size: int = 0
+    error: ProxyError | None = None
