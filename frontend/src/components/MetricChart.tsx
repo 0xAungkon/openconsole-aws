@@ -28,7 +28,8 @@ export function MetricChart({ data, height = 160 }: MetricChartProps) {
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="h-40 w-full"
+      className="w-full"
+      style={{ height: height / 1.6 }}
       preserveAspectRatio="none"
     >
       {[0.25, 0.5, 0.75].map((f) => (

@@ -8,6 +8,9 @@ import {
   Globe,
   Play,
   Plus,
+  GitBranch,
+  Link2,
+  Gauge,
   RefreshCw,
   ScrollText,
   Trash2,
@@ -28,9 +31,13 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { fetchLambdaPackage, runQuery } from '../api/proxy'
 import { Card } from '../components/Card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { MetricsCard } from '../components/MetricsCard'
+import { RoleInput } from '../components/RoleInput'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { timeAgo } from '../lib/ec2'
 import { errorMessage } from '../lib/errors'
@@ -161,6 +168,9 @@ export function FunctionPage() {
             <EnvCard fn={fn} />
             <CodeCard fn={fn} location={codeLocation} />
             <UrlCard name={name} />
+            <ConcurrencyCard name={name} />
+            <VersionsCard fn={fn} />
+            <TriggersCard fn={fn} />
             <TagsCard fn={fn} />
             <Card title="Danger zone">
               <div className="flex items-center justify-between gap-3">
@@ -173,6 +183,16 @@ export function FunctionPage() {
             </Card>
           </div>
 
+          <MetricsCard
+            description="Invocation counts and average duration from CloudWatch."
+            metrics={[
+              { label: 'Invocations', namespace: 'AWS/Lambda', metricName: 'Invocations', dimensions: [{ Name: 'FunctionName', Value: name }], stat: 'Sum' },
+              { label: 'Errors', namespace: 'AWS/Lambda', metricName: 'Errors', dimensions: [{ Name: 'FunctionName', Value: name }], stat: 'Sum' },
+              { label: 'Avg duration', namespace: 'AWS/Lambda', metricName: 'Duration', dimensions: [{ Name: 'FunctionName', Value: name }], stat: 'Average', format: (v) => `${Math.round(v)} ms` },
+              { label: 'Throttles', namespace: 'AWS/Lambda', metricName: 'Throttles', dimensions: [{ Name: 'FunctionName', Value: name }], stat: 'Sum' },
+              { label: 'Concurrent executions', namespace: 'AWS/Lambda', metricName: 'ConcurrentExecutions', dimensions: [{ Name: 'FunctionName', Value: name }], stat: 'Maximum' },
+            ]}
+          />
           <LogsCard name={name} />
 
           <ConfirmDialog
@@ -275,14 +295,16 @@ function ConfigCard({ fn }: { fn: FunctionRow }) {
   const [timeout, setTimeoutS] = useState(String(fn.Timeout))
   const [handler, setHandler] = useState(fn.Handler)
   const [description, setDescription] = useState(fn.Description)
+  const [role, setRole] = useState(fn.Role)
   useEffect(() => {
     setMemory(String(fn.MemorySize))
     setTimeoutS(String(fn.Timeout))
     setHandler(fn.Handler)
     setDescription(fn.Description)
-  }, [fn.MemorySize, fn.Timeout, fn.Handler, fn.Description])
+    setRole(fn.Role)
+  }, [fn.MemorySize, fn.Timeout, fn.Handler, fn.Description, fn.Role])
   const m = useFunctionMutation(fn.FunctionName)
-  const changed = Number(memory) !== fn.MemorySize || Number(timeout) !== fn.Timeout || handler !== fn.Handler || description !== fn.Description
+  const changed = Number(memory) !== fn.MemorySize || Number(timeout) !== fn.Timeout || handler !== fn.Handler || description !== fn.Description || role.trim() !== fn.Role
 
   return (
     <Card title="Configuration">
@@ -291,7 +313,7 @@ function ConfigCard({ fn }: { fn: FunctionRow }) {
           e.preventDefault()
           m.mutate({
             op: 'update_function_configuration',
-            params: { FunctionName: fn.FunctionName, MemorySize: Number(memory), Timeout: Number(timeout), Handler: handler.trim(), Description: description.trim() },
+            params: { FunctionName: fn.FunctionName, MemorySize: Number(memory), Timeout: Number(timeout), Handler: handler.trim(), Description: description.trim(), ...(role.trim() !== fn.Role ? { Role: role.trim() } : {}) },
             success: 'Configuration updated',
           })
         }}
@@ -314,6 +336,10 @@ function ConfigCard({ fn }: { fn: FunctionRow }) {
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="cfg-desc">Description</Label>
           <Input id="cfg-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="cfg-role">Execution role</Label>
+          <RoleInput id="cfg-role" value={role} onChange={setRole} />
         </div>
         <div><Button type="submit" disabled={!changed || m.isPending}>{m.isPending ? 'Saving…' : 'Save changes'}</Button></div>
         {m.isError && <ErrorAlert error={m.error} />}
@@ -591,6 +617,284 @@ function TagsCard({ fn }: { fn: FunctionRow }) {
         </div>
         {q.isError && <ErrorAlert error={q.error} />}
       </div>
+    </Card>
+  )
+}
+
+/* ---------------- Concurrency ---------------- */
+
+function ConcurrencyCard({ name }: { name: string }) {
+  const qc = useQueryClient()
+  const activeProfileId = useSessionStore((s) => s.activeProfileId)
+  const q = useQuery({
+    queryKey: ['lambda-concurrency', name, activeProfileId],
+    queryFn: () => runQuery<{ ReservedConcurrentExecutions?: number }>('lambda', 'get_function_concurrency', { FunctionName: name }),
+    retry: false,
+  })
+  const reserved = q.data?.ReservedConcurrentExecutions
+  const [value, setValue] = useState('')
+  useEffect(() => setValue(reserved == null ? '' : String(reserved)), [reserved])
+  const m = useMutation({
+    mutationFn: (next: number | null) =>
+      next == null
+        ? runQuery('lambda', 'delete_function_concurrency', { FunctionName: name })
+        : runQuery('lambda', 'put_function_concurrency', { FunctionName: name, ReservedConcurrentExecutions: next }),
+    onSuccess: (_r, next) => {
+      qc.invalidateQueries({ queryKey: ['lambda-concurrency', name] })
+      toast.success(next == null ? 'Reserved concurrency removed' : `Reserved concurrency set to ${next}`)
+    },
+  })
+  const changed = (value.trim() === '' ? null : Number(value)) !== (reserved ?? null)
+  return (
+    <Card title={<span className="flex items-center gap-2"><Gauge className="h-4 w-4 text-primary" />Concurrency</span>}>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="concurrency">Reserved concurrent executions</Label>
+        <div className="flex items-center gap-2">
+          <Input id="concurrency" type="number" min={0} max={1000} value={value} onChange={(e) => setValue(e.target.value)} placeholder="Unreserved (account pool)" className="w-48" />
+          <Button size="sm" disabled={!changed || m.isPending || q.isPending} onClick={() => m.mutate(value.trim() === '' ? null : Number(value))}>{m.isPending ? 'Saving…' : 'Save'}</Button>
+          {reserved != null && <Button size="sm" variant="ghost" disabled={m.isPending} onClick={() => m.mutate(null)}>Remove</Button>}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {reserved == null ? 'Uses the shared account pool. Set a number to guarantee capacity (0 pauses the function).' : reserved === 0 ? 'Set to 0 — the function is throttled and will not run.' : `Up to ${reserved} instances run at once; extra invocations are throttled.`}
+        </p>
+        {q.isError && <ErrorAlert error={q.error} />}
+        {m.isError && <ErrorAlert error={m.error} />}
+      </div>
+    </Card>
+  )
+}
+
+/* ---------------- Versions & aliases ---------------- */
+
+function VersionsCard({ fn }: { fn: FunctionRow }) {
+  const qc = useQueryClient()
+  const activeProfileId = useSessionStore((s) => s.activeProfileId)
+  const name = fn.FunctionName
+  const [aliasOpen, setAliasOpen] = useState(false)
+  const [aliasName, setAliasName] = useState('')
+  const [aliasVersion, setAliasVersion] = useState('')
+  const [confirmAlias, setConfirmAlias] = useState<string | null>(null)
+  const versions = useQuery({
+    queryKey: ['lambda-versions', name, activeProfileId],
+    queryFn: () => runQuery<{ Versions?: { Version: string; Description?: string; LastModified?: string; CodeSize?: number }[] }>('lambda', 'list_versions_by_function', { FunctionName: name, MaxItems: 50 }),
+    retry: false,
+  })
+  const aliases = useQuery({
+    queryKey: ['lambda-aliases', name, activeProfileId],
+    queryFn: () => runQuery<{ Aliases?: { Name: string; FunctionVersion: string; Description?: string }[] }>('lambda', 'list_aliases', { FunctionName: name, MaxItems: 50 }),
+    retry: false,
+  })
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['lambda-versions', name] })
+    qc.invalidateQueries({ queryKey: ['lambda-aliases', name] })
+  }
+  const publish = useMutation({
+    mutationFn: () => runQuery<{ Version: string }>('lambda', 'publish_version', { FunctionName: name }),
+    onSuccess: (r) => {
+      invalidate()
+      toast.success(`Published version ${r.Version}`)
+    },
+  })
+  const saveAlias = useMutation({
+    mutationFn: async () => {
+      const existing = aliases.data?.Aliases?.find((a) => a.Name === aliasName.trim())
+      return runQuery('lambda', existing ? 'update_alias' : 'create_alias', { FunctionName: name, Name: aliasName.trim(), FunctionVersion: aliasVersion })
+    },
+    onSuccess: () => {
+      invalidate()
+      setAliasOpen(false)
+      toast.success(`Alias “${aliasName.trim()}” → ${aliasVersion}`)
+    },
+  })
+  const deleteAlias = useMutation({
+    mutationFn: (alias: string) => runQuery('lambda', 'delete_alias', { FunctionName: name, Name: alias }),
+    onSuccess: (_r, alias) => {
+      invalidate()
+      toast.success(`Alias “${alias}” deleted`)
+    },
+    onSettled: () => setConfirmAlias(null),
+  })
+  const versionList = (versions.data?.Versions ?? []).filter((v) => v.Version !== '$LATEST').sort((a, b) => Number(b.Version) - Number(a.Version))
+  const aliasList = aliases.data?.Aliases ?? []
+  const aliasFor = (version: string) => aliasList.filter((a) => a.FunctionVersion === version).map((a) => a.Name)
+
+  return (
+    <Card
+      title={<span className="flex items-center gap-2"><GitBranch className="h-4 w-4 text-primary" />Versions & aliases</span>}
+      actions={
+        <div className="flex items-center gap-1">
+          <Button size="xs" variant="outline" onClick={() => { setAliasName(''); setAliasVersion(versionList[0]?.Version ?? '$LATEST'); setAliasOpen(true) }}><Link2 />Alias</Button>
+          <Button size="xs" onClick={() => publish.mutate()} disabled={publish.isPending || fn.State !== 'Active'}><Plus />{publish.isPending ? 'Publishing…' : 'Publish version'}</Button>
+        </div>
+      }
+    >
+      <p className="mb-3 text-xs text-muted-foreground">Publishing freezes the current code and configuration as an immutable version. Aliases are named pointers (e.g. <span className="font-mono">prod</span>) you can move between versions.</p>
+      {versions.isPending ? <Skeleton className="h-16 w-full" /> : versions.isError ? <ErrorAlert error={versions.error} /> : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs uppercase tracking-wide">Version</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide">Aliases</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide">Published</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide">Size</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="font-mono text-xs">$LATEST</TableCell>
+                <TableCell>{aliasFor('$LATEST').map((a) => <AliasBadge key={a} name={a} onDelete={() => setConfirmAlias(a)} />)}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">unpublished (current code)</TableCell>
+                <TableCell>{formatBytes(fn.CodeSize)}</TableCell>
+              </TableRow>
+              {versionList.map((v) => (
+                <TableRow key={v.Version}>
+                  <TableCell className="font-mono text-xs">{v.Version}{v.Description && <div className="text-[10px] text-muted-foreground">{v.Description}</div>}</TableCell>
+                  <TableCell><div className="flex flex-wrap gap-1">{aliasFor(v.Version).map((a) => <AliasBadge key={a} name={a} onDelete={() => setConfirmAlias(a)} />)}</div></TableCell>
+                  <TableCell>{timeAgo(v.LastModified)}</TableCell>
+                  <TableCell>{formatBytes(v.CodeSize ?? 0)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      {publish.isError && <div className="mt-2"><ErrorAlert error={publish.error} /></div>}
+
+      <Dialog open={aliasOpen} onOpenChange={(o) => !o && setAliasOpen(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create or move an alias</DialogTitle>
+            <DialogDescription>An alias with the same name is updated to point at the chosen version.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); if (aliasName.trim()) saveAlias.mutate() }} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="alias-name">Alias name</Label>
+              <Input id="alias-name" value={aliasName} onChange={(e) => setAliasName(e.target.value)} placeholder="prod" list="alias-suggestions" autoFocus />
+              <datalist id="alias-suggestions">{aliasList.map((a) => <option key={a.Name} value={a.Name} />)}</datalist>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="alias-version">Points to version</Label>
+              <select id="alias-version" value={aliasVersion} onChange={(e) => setAliasVersion(e.target.value)} className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm">
+                <option value="$LATEST">$LATEST</option>
+                {versionList.map((v) => <option key={v.Version} value={v.Version}>{v.Version}</option>)}
+              </select>
+            </div>
+            {saveAlias.isError && <ErrorAlert error={saveAlias.error} />}
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setAliasOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={!aliasName.trim() || saveAlias.isPending}>{saveAlias.isPending ? 'Saving…' : 'Save alias'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog open={confirmAlias != null} title={`Delete alias “${confirmAlias}”?`} description="Anything invoking the function through this alias will stop working." confirmLabel="Delete alias" pending={deleteAlias.isPending} onCancel={() => setConfirmAlias(null)} onConfirm={() => confirmAlias && deleteAlias.mutate(confirmAlias)} />
+    </Card>
+  )
+}
+
+function AliasBadge({ name, onDelete }: { name: string; onDelete: () => void }) {
+  return (
+    <Badge variant="secondary" className="h-auto gap-1 rounded-md py-0.5 font-mono text-[11px]">
+      {name}
+      <button type="button" onClick={onDelete} aria-label={`Delete alias ${name}`} className="text-muted-foreground hover:text-destructive"><X className="size-3" /></button>
+    </Badge>
+  )
+}
+
+/* ---------------- Triggers (event source mappings) ---------------- */
+
+function TriggersCard({ fn }: { fn: FunctionRow }) {
+  const qc = useQueryClient()
+  const activeProfileId = useSessionStore((s) => s.activeProfileId)
+  const name = fn.FunctionName
+  const [addOpen, setAddOpen] = useState(false)
+  const [sourceArn, setSourceArn] = useState('')
+  const [batch, setBatch] = useState('10')
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const q = useQuery({
+    queryKey: ['lambda-triggers', name, activeProfileId],
+    queryFn: () => runQuery<{ EventSourceMappings?: { UUID: string; EventSourceArn?: string; State?: string; BatchSize?: number; LastModified?: string }[] }>('lambda', 'list_event_source_mappings', { FunctionName: name, MaxItems: 50 }),
+    retry: false,
+    refetchInterval: (q) => (q.state.data?.EventSourceMappings?.some((m) => /ing$/.test(m.State ?? '')) ? 5000 : false),
+  })
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['lambda-triggers', name] })
+  const add = useMutation({
+    mutationFn: () => runQuery('lambda', 'create_event_source_mapping', { FunctionName: name, EventSourceArn: sourceArn.trim(), BatchSize: Number(batch), ...(/:(dynamodb|kinesis):/.test(sourceArn) ? { StartingPosition: 'LATEST' } : {}) }),
+    onSuccess: () => {
+      invalidate()
+      setAddOpen(false)
+      setSourceArn('')
+      toast.success('Trigger added')
+    },
+  })
+  const toggle = useMutation({
+    mutationFn: ({ uuid, enabled }: { uuid: string; enabled: boolean }) => runQuery('lambda', 'update_event_source_mapping', { UUID: uuid, Enabled: enabled }),
+    onSuccess: (_r, { enabled }) => {
+      invalidate()
+      toast.success(`Trigger ${enabled ? 'enabled' : 'disabled'}`)
+    },
+  })
+  const remove = useMutation({
+    mutationFn: (uuid: string) => runQuery('lambda', 'delete_event_source_mapping', { UUID: uuid }),
+    onSuccess: () => {
+      invalidate()
+      toast.success('Trigger removed')
+    },
+    onSettled: () => setConfirmDelete(null),
+  })
+  const mappings = q.data?.EventSourceMappings ?? []
+  const sourceKind = (arn = '') => arn.split(':')[2]?.toUpperCase() || 'Source'
+
+  return (
+    <Card
+      title="Triggers"
+      actions={<Button size="xs" variant="outline" onClick={() => setAddOpen(true)}><Plus />Add trigger</Button>}
+    >
+      <p className="mb-3 text-xs text-muted-foreground">Queues and streams that invoke this function automatically (SQS, DynamoDB Streams, Kinesis, MSK…). HTTP access is under Function URL.</p>
+      {q.isPending ? <Skeleton className="h-12 w-full" /> : q.isError ? <ErrorAlert error={q.error} /> : mappings.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No triggers configured.</p>
+      ) : (
+        <ul className="divide-y">
+          {mappings.map((m) => (
+            <li key={m.UUID} className="flex items-center gap-3 py-2">
+              <Badge variant="outline" className="shrink-0">{sourceKind(m.EventSourceArn)}</Badge>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-mono text-xs">{m.EventSourceArn}</div>
+                <div className="text-[11px] text-muted-foreground">{m.State} · batch {m.BatchSize} · {timeAgo(m.LastModified)}</div>
+              </div>
+              <Switch checked={m.State === 'Enabled' || m.State === 'Enabling'} disabled={toggle.isPending || /ing$/.test(m.State ?? '')} onCheckedChange={(v) => toggle.mutate({ uuid: m.UUID, enabled: v })} aria-label="Enable trigger" />
+              <Button variant="ghost" size="icon-sm" onClick={() => setConfirmDelete(m.UUID)} aria-label="Remove trigger" className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"><Trash2 /></Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {(toggle.isError || remove.isError) && <div className="mt-2"><ErrorAlert error={toggle.error || remove.error} /></div>}
+
+      <Dialog open={addOpen} onOpenChange={(o) => !o && setAddOpen(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add a trigger</DialogTitle>
+            <DialogDescription>Paste the ARN of an SQS queue, DynamoDB stream or Kinesis stream. The execution role must be allowed to read from it.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); if (sourceArn.trim()) add.mutate() }} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="trigger-arn">Source ARN</Label>
+              <Input id="trigger-arn" value={sourceArn} onChange={(e) => setSourceArn(e.target.value)} placeholder="arn:aws:sqs:us-east-1:123456789012:my-queue" className="font-mono text-xs" autoFocus />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="trigger-batch">Batch size</Label>
+              <Input id="trigger-batch" type="number" min={1} max={10000} value={batch} onChange={(e) => setBatch(e.target.value)} className="w-32" />
+            </div>
+            {add.isError && <ErrorAlert error={add.error} />}
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={!sourceArn.trim() || add.isPending}>{add.isPending ? 'Adding…' : 'Add trigger'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog open={confirmDelete != null} title="Remove this trigger?" description="The source will stop invoking the function." confirmLabel="Remove" pending={remove.isPending} onCancel={() => setConfirmDelete(null)} onConfirm={() => confirmDelete && remove.mutate(confirmDelete)} />
     </Card>
   )
 }

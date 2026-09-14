@@ -13,6 +13,11 @@ import {
   FileText,
   Folder,
   FolderPlus,
+  Globe,
+  Info,
+  Link2,
+  Lock,
+  PencilLine,
   Plus,
   RefreshCw,
   Search,
@@ -20,7 +25,7 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { cn } from 'cn'
@@ -49,6 +54,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { runQuery } from '../api/proxy'
 import { Card } from '../components/Card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -115,6 +121,8 @@ export function BucketPage() {
   const [pages, setPages] = useState<string[]>([]) // continuation tokens of loaded extra pages
   const [confirm, setConfirm] = useState<{ title: string; description: string; label: string; run: () => Promise<unknown> } | null>(null)
   const [folderOpen, setFolderOpen] = useState(false)
+  const [renaming, setRenaming] = useState<ObjectEntry | null>(null)
+  const [inspecting, setInspecting] = useState<ObjectEntry | null>(null)
   const [dragging, setDragging] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -201,6 +209,34 @@ export function BucketPage() {
       refresh()
       setFolderOpen(false)
       toast.success(`Folder “${name}” created`)
+    },
+  })
+
+  const rename = useMutation({
+    mutationFn: async ({ entry, to }: { entry: ObjectEntry; to: string }) => {
+      if (entry.kind === 'file') {
+        await runQuery('s3', 'copy_object', { Bucket: bucket, CopySource: { Bucket: bucket, Key: entry.key }, Key: to })
+        await runQuery('s3', 'delete_object', { Bucket: bucket, Key: entry.key })
+        return 1
+      }
+      // Folder: copy every object under the prefix to the new prefix, then delete the old ones.
+      let moved = 0
+      let token: string | undefined
+      do {
+        const page = await runQuery<any>('s3', 'list_objects_v2', { Bucket: bucket, Prefix: entry.key, MaxKeys: 1000, ...(token ? { ContinuationToken: token } : {}) })
+        for (const o of page.Contents ?? []) {
+          await runQuery('s3', 'copy_object', { Bucket: bucket, CopySource: { Bucket: bucket, Key: o.Key }, Key: to + (o.Key as string).slice(entry.key.length) })
+          moved++
+        }
+        token = page.IsTruncated ? page.NextContinuationToken : undefined
+      } while (token)
+      await deleteUnderPrefix(bucket, entry.key)
+      return moved
+    },
+    onSuccess: (n, { entry, to }) => {
+      refresh()
+      setRenaming(null)
+      toast.success(entry.kind === 'file' ? `Moved to ${to}` : `Moved ${n} object${n === 1 ? '' : 's'} to ${to}`)
     },
   })
 
@@ -296,6 +332,7 @@ export function BucketPage() {
                 <h1 className="truncate text-lg font-semibold">{bucket}</h1>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Region {region} <span className="px-1 opacity-50">/</span> {listing.data ? `${listing.data.entries.length}${listing.data.next ? '+' : ''} items in this folder` : 'Loading…'}
+                  <span className="px-1 opacity-50">/</span> <BucketSize bucket={bucket} />
                 </p>
               </div>
             </div>
@@ -418,6 +455,8 @@ export function BucketPage() {
                           onToggle={() => toggle(e.key)}
                           onOpen={() => (e.kind === 'folder' ? setPrefix(e.key) : download.mutate(e))}
                           onDownload={() => download.mutate(e)}
+                          onRename={() => setRenaming(e)}
+                          onInspect={() => setInspecting(e)}
                           onDelete={() =>
                             setConfirm({
                               title: `Delete ${e.kind} “${e.name}”?`,
@@ -445,6 +484,8 @@ export function BucketPage() {
           <div className="grid gap-5 lg:grid-cols-2">
             <VersioningCard bucket={bucket} />
             <PublicAccessCard bucket={bucket} />
+            <EncryptionCard bucket={bucket} />
+            <WebsiteCard bucket={bucket} region={region} />
             <TagsCard bucket={bucket} />
             <Card title="Danger zone">
               <div className="flex flex-col gap-3">
@@ -508,6 +549,8 @@ export function BucketPage() {
       />
 
       <NewFolderDialog open={folderOpen} pending={createFolder.isPending} onClose={() => setFolderOpen(false)} onCreate={(name) => createFolder.mutate(name)} />
+      <RenameDialog entry={renaming} pending={rename.isPending} error={rename.isError ? rename.error : undefined} onClose={() => setRenaming(null)} onRename={(to) => renaming && rename.mutate({ entry: renaming, to })} />
+      <ObjectInfoDialog bucket={bucket} entry={inspecting} onClose={() => setInspecting(null)} />
     </div>
   )
 }
@@ -522,6 +565,8 @@ function ObjectRow({
   onToggle,
   onOpen,
   onDownload,
+  onRename,
+  onInspect,
   onDelete,
 }: {
   entry: ObjectEntry
@@ -529,6 +574,8 @@ function ObjectRow({
   onToggle: () => void
   onOpen: () => void
   onDownload: () => void
+  onRename: () => void
+  onInspect: () => void
   onDelete: () => void
 }) {
   const [copied, setCopied] = useState(false)
@@ -572,6 +619,24 @@ function ObjectRow({
               <TooltipContent>Download</TooltipContent>
             </Tooltip>
           )}
+          {entry.kind === 'file' && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon-sm" onClick={(e) => { stop(e); onInspect() }} aria-label="Properties & share link" className="text-muted-foreground hover:text-primary">
+                  <Info />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Properties & share link</TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon-sm" onClick={(e) => { stop(e); onRename() }} aria-label="Rename or move" className="text-muted-foreground hover:text-primary">
+                <PencilLine />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Rename / move</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon-sm" onClick={copyKey} aria-label="Copy key" className="text-muted-foreground hover:text-primary">
@@ -615,6 +680,286 @@ function NewFolderDialog({ open, pending, onClose, onCreate }: { open: boolean; 
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/* ---------------- Bucket size summary ---------------- */
+
+const SIZE_SCAN_CAP = 5000
+
+function BucketSize({ bucket }: { bucket: string }) {
+  const activeProfileId = useSessionStore((s) => s.activeProfileId)
+  const q = useQuery({
+    queryKey: ['s3-bucket-size', bucket, activeProfileId],
+    queryFn: async () => {
+      let count = 0
+      let bytes = 0
+      let token: string | undefined
+      let capped = false
+      do {
+        const page = await runQuery<any>('s3', 'list_objects_v2', { Bucket: bucket, MaxKeys: 1000, ...(token ? { ContinuationToken: token } : {}) })
+        for (const o of page.Contents ?? []) {
+          count++
+          bytes += o.Size ?? 0
+        }
+        token = page.IsTruncated ? page.NextContinuationToken : undefined
+        if (count >= SIZE_SCAN_CAP && token) {
+          capped = true
+          break
+        }
+      } while (token)
+      return { count, bytes, capped }
+    },
+    enabled: false,
+    retry: false,
+    meta: { silent: true },
+  })
+  if (q.data) return <span>{q.data.count.toLocaleString()}{q.data.capped ? '+' : ''} objects · {formatBytes(q.data.bytes)}{q.data.capped ? '+' : ''}</span>
+  return (
+    <button type="button" onClick={() => q.refetch()} disabled={q.isFetching} className="text-primary hover:underline disabled:opacity-60">
+      {q.isFetching ? 'Calculating size…' : q.isError ? 'Size unavailable' : 'Calculate size'}
+    </button>
+  )
+}
+
+/* ---------------- Rename / move ---------------- */
+
+function RenameDialog({ entry, pending, error, onClose, onRename }: { entry: ObjectEntry | null; pending: boolean; error?: unknown; onClose: () => void; onRename: (to: string) => void }) {
+  const [to, setTo] = useState('')
+  useEffect(() => setTo(entry?.key ?? ''), [entry])
+  const isFolder = entry?.kind === 'folder'
+  const target = isFolder ? to.trim().replace(/\/*$/, '/') : to.trim()
+  const valid = !!target && target !== entry?.key && !target.startsWith('/') && (!isFolder || !target.startsWith(entry!.key))
+  return (
+    <Dialog open={entry != null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isFolder ? 'Rename or move folder' : 'Rename or move file'}</DialogTitle>
+          <DialogDescription>Edit the full key. Changing the path before the name moves it to another folder. {isFolder ? 'Every object inside is copied to the new prefix, then the old ones are removed.' : 'The object is copied to the new key and the original is deleted.'}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); if (valid) onRename(target) }} className="flex flex-col gap-2">
+          <Label htmlFor="rename-key">New key</Label>
+          <Input id="rename-key" value={to} onChange={(e) => setTo(e.target.value)} className="font-mono text-xs" autoFocus />
+          {error != null && <ErrorAlert error={error} />}
+          <DialogFooter className="mt-2">
+            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={!valid || pending}>{pending ? 'Moving…' : 'Move'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* ---------------- Object properties + share link ---------------- */
+
+const SHARE_EXPIRIES = [
+  { label: '15 minutes', seconds: 900 },
+  { label: '1 hour', seconds: 3600 },
+  { label: '1 day', seconds: 86400 },
+  { label: '7 days', seconds: 7 * 86400 },
+]
+
+function ObjectInfoDialog({ bucket, entry, onClose }: { bucket: string; entry: ObjectEntry | null; onClose: () => void }) {
+  const activeProfileId = useSessionStore((s) => s.activeProfileId)
+  const [expiry, setExpiry] = useState('3600')
+  const [link, setLink] = useState('')
+  const [copied, setCopied] = useState(false)
+  useEffect(() => { setLink(''); setCopied(false) }, [entry])
+  const head = useQuery({
+    queryKey: ['s3-head', bucket, entry?.key, activeProfileId],
+    queryFn: () => runQuery<any>('s3', 'head_object', { Bucket: bucket, Key: entry!.key }),
+    enabled: !!entry,
+    retry: false,
+  })
+  const share = useMutation({
+    mutationFn: () => runQuery<string>('s3', 'generate_presigned_url', { ClientMethod: 'get_object', Params: { Bucket: bucket, Key: entry!.key }, ExpiresIn: Number(expiry) }),
+    onSuccess: (url) => {
+      setLink(url)
+      toast.success('Share link created')
+    },
+  })
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      toast.error('Clipboard is unavailable in this browser')
+    }
+  }
+  const h = head.data
+  const meta: Record<string, string> = h?.Metadata ?? {}
+  return (
+    <Dialog open={entry != null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="overflow-hidden sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="break-all">{entry?.name}</DialogTitle>
+          <DialogDescription className="break-all font-mono text-xs">{entry?.key}</DialogDescription>
+        </DialogHeader>
+        {head.isPending ? <Skeleton className="h-32 w-full" /> : head.isError ? <ErrorAlert error={head.error} /> : (
+          <dl className="divide-y text-sm">
+            {[
+              ['Size', formatBytes(h.ContentLength)],
+              ['Content type', h.ContentType || '—'],
+              ['Last modified', h.LastModified ? new Date(h.LastModified).toLocaleString() : '—'],
+              ['ETag', String(h.ETag ?? '—').replace(/"/g, '')],
+              ['Storage class', h.StorageClass || 'STANDARD'],
+              ['Encryption', h.ServerSideEncryption || 'None'],
+              ...(h.VersionId ? [['Version', h.VersionId]] : []),
+              ...Object.entries(meta).map(([k, v]) => [`x-amz-meta-${k}`, v]),
+            ].map(([k, v]) => (
+              <div key={k as string} className="flex items-center justify-between gap-3 py-1.5">
+                <dt className="shrink-0 text-muted-foreground">{k}</dt>
+                <dd className="min-w-0 break-all text-right font-mono text-xs">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        <div className="flex min-w-0 flex-col gap-2 overflow-hidden rounded-lg border p-3">
+          <div className="flex items-center gap-2 text-sm font-medium"><Link2 className="size-4 text-primary" />Share link</div>
+          <p className="text-xs text-muted-foreground">A signed URL anyone can use to download this file until it expires — no AWS account needed.</p>
+          <div className="flex items-center gap-2">
+            <Select value={expiry} onValueChange={setExpiry}>
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>{SHARE_EXPIRIES.map((e) => <SelectItem key={e.seconds} value={String(e.seconds)}>{e.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Button size="sm" onClick={() => share.mutate()} disabled={share.isPending}>{share.isPending ? 'Creating…' : 'Create link'}</Button>
+          </div>
+          {link && (
+            <div className="flex min-w-0 items-center gap-2 overflow-hidden rounded-md border bg-muted/40 px-2 py-1.5">
+              <a href={link} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-mono text-xs text-primary hover:underline">{link}</a>
+              <Button variant="ghost" size="icon-xs" onClick={copyLink} aria-label="Copy link" className="text-muted-foreground hover:text-primary">{copied ? <Check className="text-green-500" /> : <Copy />}</Button>
+            </div>
+          )}
+          {share.isError && <ErrorAlert error={share.error} />}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* ---------------- Encryption ---------------- */
+
+function EncryptionCard({ bucket }: { bucket: string }) {
+  const qc = useQueryClient()
+  const activeProfileId = useSessionStore((s) => s.activeProfileId)
+  const q = useQuery({
+    queryKey: ['s3-encryption', bucket, activeProfileId],
+    queryFn: async () => {
+      try {
+        const r = await runQuery<any>('s3', 'get_bucket_encryption', { Bucket: bucket })
+        return (r.ServerSideEncryptionConfiguration?.Rules?.[0]?.ApplyServerSideEncryptionByDefault?.SSEAlgorithm as string | undefined) ?? null
+      } catch (err) {
+        if (errorMessage(err).includes('ServerSideEncryptionConfigurationNotFoundError')) return null
+        throw err
+      }
+    },
+    retry: false,
+  })
+  const m = useMutation({
+    mutationFn: (enable: boolean) =>
+      enable
+        ? runQuery('s3', 'put_bucket_encryption', { Bucket: bucket, ServerSideEncryptionConfiguration: { Rules: [{ ApplyServerSideEncryptionByDefault: { SSEAlgorithm: 'AES256' }, BucketKeyEnabled: true }] } })
+        : runQuery('s3', 'delete_bucket_encryption', { Bucket: bucket }),
+    onSuccess: (_r, enable) => {
+      qc.invalidateQueries({ queryKey: ['s3-encryption', bucket] })
+      toast.success(enable ? 'Default encryption enabled (SSE-S3)' : 'Default encryption removed')
+    },
+  })
+  return (
+    <Card title={<span className="flex items-center gap-2"><Lock className="h-4 w-4 text-primary" />Encryption</span>}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <Label htmlFor="encryption-switch">Encrypt new files at rest</Label>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {q.isPending ? 'Loading…' : q.data ? `Enabled — new objects use ${q.data === 'aws:kms' ? 'SSE-KMS' : 'SSE-S3 (AES-256)'}.` : 'Disabled — objects are stored unencrypted unless the upload asks for it.'}
+          </p>
+        </div>
+        <Switch id="encryption-switch" checked={!!q.data} disabled={q.isPending || m.isPending} onCheckedChange={(v) => m.mutate(v)} />
+      </div>
+      {q.isError && <div className="mt-3"><ErrorAlert error={q.error} /></div>}
+      {m.isError && <div className="mt-3"><ErrorAlert error={m.error} /></div>}
+    </Card>
+  )
+}
+
+/* ---------------- Static website hosting ---------------- */
+
+function WebsiteCard({ bucket, region }: { bucket: string; region: string }) {
+  const qc = useQueryClient()
+  const activeProfileId = useSessionStore((s) => s.activeProfileId)
+  const endpointOverride = useSessionStore((s) => s.endpointUrl)
+  const guestEndpoint = useAuthStore((s) => s.guestCreds?.endpointUrl)
+  const [index, setIndex] = useState('index.html')
+  const [error, setError] = useState('error.html')
+  const q = useQuery({
+    queryKey: ['s3-website', bucket, activeProfileId],
+    queryFn: async () => {
+      try {
+        const r = await runQuery<any>('s3', 'get_bucket_website', { Bucket: bucket })
+        return { index: r.IndexDocument?.Suffix as string | undefined, error: r.ErrorDocument?.Key as string | undefined }
+      } catch (err) {
+        if (errorMessage(err).includes('NoSuchWebsiteConfiguration')) return null
+        throw err
+      }
+    },
+    retry: false,
+  })
+  useEffect(() => {
+    if (q.data) {
+      setIndex(q.data.index ?? 'index.html')
+      setError(q.data.error ?? '')
+    }
+  }, [q.data])
+  const m = useMutation({
+    mutationFn: (enable: boolean) =>
+      enable
+        ? runQuery('s3', 'put_bucket_website', { Bucket: bucket, WebsiteConfiguration: { IndexDocument: { Suffix: index.trim() || 'index.html' }, ...(error.trim() ? { ErrorDocument: { Key: error.trim() } } : {}) } })
+        : runQuery('s3', 'delete_bucket_website', { Bucket: bucket }),
+    onSuccess: (_r, enable) => {
+      qc.invalidateQueries({ queryKey: ['s3-website', bucket] })
+      toast.success(enable ? 'Static website hosting enabled' : 'Static website hosting disabled')
+    },
+  })
+  const enabled = !!q.data
+  const local = endpointOverride || guestEndpoint
+  const url = local
+    ? `${local.replace(/\/$/, '').replace('://', `://${bucket}.s3-website.`)}`
+    : `http://${bucket}.s3-website${region === 'us-east-1' || region.startsWith('us-west') || region.startsWith('eu-west-1') || region.startsWith('ap-southeast') ? '-' : '.'}${region}.amazonaws.com`
+  const changed = enabled && ((q.data?.index ?? 'index.html') !== index.trim() || (q.data?.error ?? '') !== error.trim())
+  return (
+    <Card title={<span className="flex items-center gap-2"><Globe className="h-4 w-4 text-primary" />Static website</span>}>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <Label htmlFor="website-switch">Host a static website</Label>
+            <p className="mt-0.5 text-xs text-muted-foreground">Serve the files in this bucket over HTTP. Requires public read access (turn off “Block public access” and add a bucket policy).</p>
+          </div>
+          <Switch id="website-switch" checked={enabled} disabled={q.isPending || m.isPending} onCheckedChange={(v) => m.mutate(v)} />
+        </div>
+        {enabled && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="website-index">Index document</Label>
+                <Input id="website-index" value={index} onChange={(e) => setIndex(e.target.value)} className="font-mono text-xs" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="website-error">Error document</Label>
+                <Input id="website-error" value={error} onChange={(e) => setError(e.target.value)} placeholder="Optional" className="font-mono text-xs" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1.5">
+              <a href={url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate font-mono text-xs text-primary hover:underline">{url}</a>
+            </div>
+            {changed && <div><Button size="sm" onClick={() => m.mutate(true)} disabled={m.isPending}>{m.isPending ? 'Saving…' : 'Save documents'}</Button></div>}
+          </>
+        )}
+        {q.isError && <ErrorAlert error={q.error} />}
+        {m.isError && <ErrorAlert error={m.error} />}
+      </div>
+    </Card>
   )
 }
 

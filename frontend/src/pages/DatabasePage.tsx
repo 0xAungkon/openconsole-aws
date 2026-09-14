@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Camera, Check, Copy, Database, Play, Plus, RefreshCw, RotateCw, Square, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Camera, Check, Copy, Database, FileText, Play, Plus, RefreshCw, RotateCw, Shield, Square, Trash2, X } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { cn } from 'cn'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -15,10 +16,12 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { runQuery } from '../api/proxy'
 import { Card } from '../components/Card'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { MetricsCard } from '../components/MetricsCard'
 import { DbStatusBadge } from '../components/DbStatusBadge'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { timeAgo } from '../lib/ec2'
@@ -88,7 +91,7 @@ export function DatabasePage() {
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground"><Database aria-hidden="true" className="h-6 w-6" /></div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="truncate text-lg font-semibold">{db.Id}</h1>
+                  <NameEditor db={db} onRenamed={(next) => navigate(`/${profile}/databases/${encodeURIComponent(next)}`, { replace: true })} />
                   <DbStatusBadge status={db.Status} size="md" />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -104,7 +107,7 @@ export function DatabasePage() {
               <ActionButton label="Start" icon={<Play />} tone="green" disabled={power.isPending || db.Status !== 'stopped'} onClick={() => act('start_db_instance', 'Start')} />
               <ActionButton label="Stop" icon={<Square />} tone="amber" disabled={power.isPending || db.Status !== 'available'} onClick={() => setConfirm({ title: `Stop ${db.Id}?`, description: 'Connections will be dropped. AWS restarts stopped databases automatically after 7 days.', label: 'Stop', run: () => act('stop_db_instance', 'Stop') })} />
               <ActionButton label="Reboot" icon={<RotateCw />} tone="blue" disabled={power.isPending || db.Status !== 'available'} onClick={() => setConfirm({ title: `Reboot ${db.Id}?`, description: 'The database will be unavailable for a short time.', label: 'Reboot', run: () => act('reboot_db_instance', 'Reboot') })} />
-              <ActionButton label="Delete" icon={<Trash2 />} tone="red" disabled={power.isPending || db.Status === 'deleting'} onClick={() => setDeleteOpen(true)} />
+              <ActionButton label="Delete" icon={<Trash2 />} tone="red" disabled={power.isPending || db.Status === 'deleting' || db.DeletionProtection} onClick={() => setDeleteOpen(true)} />
             </div>
           </div>
 
@@ -119,7 +122,9 @@ export function DatabasePage() {
                 <Detail label="Storage" value={`${db.Storage} GiB ${db.StorageType}`} />
                 <Detail label="Multi-AZ" value={db.MultiAZ ? 'Yes' : 'No'} />
                 <Detail label="Public access" value={db.Public ? <Badge className="border-transparent bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">Public</Badge> : 'Private'} />
-                <Detail label="Backups" value={db.BackupRetention ? `${db.BackupRetention} day${db.BackupRetention === 1 ? '' : 's'}` : 'Disabled'} />
+                <Detail label="Backups" value={db.BackupRetention ? `${db.BackupRetention} day${db.BackupRetention === 1 ? '' : 's'}${db.BackupWindow ? ` · ${db.BackupWindow} UTC` : ''}` : 'Disabled'} />
+                <Detail label="Maintenance window" value={db.MaintenanceWindow ? `${db.MaintenanceWindow} UTC` : '—'} />
+                <Detail label="Deletion protection" value={db.DeletionProtection ? <Badge variant="secondary" className="border-transparent bg-green-50 text-green-700 dark:bg-green-950/60 dark:text-green-300">On</Badge> : 'Off'} />
                 <Detail label="VPC" value={db.VpcId || '—'} mono />
                 <Detail label="Created" value={db.Created ? `${new Date(db.Created).toLocaleString()} (${timeAgo(db.Created)})` : '—'} />
                 <Detail label="ARN" value={<CopyText text={db.Arn} />} mono />
@@ -127,6 +132,7 @@ export function DatabasePage() {
             </Card>
             <ConnectionCard db={db} />
             <ConfigCard db={db} />
+            <FirewallCard db={db} />
             <SnapshotsCard db={db} />
             <TagsCard db={db} />
             <Card title="Danger zone">
@@ -135,10 +141,24 @@ export function DatabasePage() {
                   <div className="text-sm font-medium">Delete database</div>
                   <div className="text-xs text-muted-foreground">Optionally take a final snapshot first.</div>
                 </div>
-                <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>Delete</Button>
+                <Button variant="destructive" size="sm" disabled={db.DeletionProtection} onClick={() => setDeleteOpen(true)}>Delete</Button>
               </div>
+              {db.DeletionProtection && <p className="mt-2 text-xs text-muted-foreground">Deletion protection is on — turn it off in Configuration first.</p>}
             </Card>
           </div>
+
+          <MetricsCard
+            description="Live CloudWatch metrics for this instance."
+            metrics={[
+              { label: 'CPU', namespace: 'AWS/RDS', metricName: 'CPUUtilization', dimensions: [{ Name: 'DBInstanceIdentifier', Value: db.Id }], stat: 'Average', format: (v) => `${v.toFixed(1)}%` },
+              { label: 'Connections', namespace: 'AWS/RDS', metricName: 'DatabaseConnections', dimensions: [{ Name: 'DBInstanceIdentifier', Value: db.Id }], stat: 'Average', format: (v) => String(Math.round(v)) },
+              { label: 'Free storage', namespace: 'AWS/RDS', metricName: 'FreeStorageSpace', dimensions: [{ Name: 'DBInstanceIdentifier', Value: db.Id }], stat: 'Average', format: (v) => `${(v / 1024 ** 3).toFixed(1)} GiB` },
+              { label: 'Free memory', namespace: 'AWS/RDS', metricName: 'FreeableMemory', dimensions: [{ Name: 'DBInstanceIdentifier', Value: db.Id }], stat: 'Average', format: (v) => `${(v / 1024 ** 2).toFixed(0)} MiB` },
+              { label: 'Read IOPS', namespace: 'AWS/RDS', metricName: 'ReadIOPS', dimensions: [{ Name: 'DBInstanceIdentifier', Value: db.Id }], stat: 'Average', format: (v) => v.toFixed(1) },
+              { label: 'Write IOPS', namespace: 'AWS/RDS', metricName: 'WriteIOPS', dimensions: [{ Name: 'DBInstanceIdentifier', Value: db.Id }], stat: 'Average', format: (v) => v.toFixed(1) },
+            ]}
+          />
+          <LogsCard db={db} />
 
           <ConfirmDialog open={confirm != null} title={confirm?.title ?? ''} description={confirm?.description ?? ''} confirmLabel={confirm?.label} destructive={confirm?.label === 'Stop'} pending={power.isPending} onCancel={() => setConfirm(null)} onConfirm={() => { confirm?.run(); setConfirm(null) }} />
           <DeleteDialog db={db} open={deleteOpen} onClose={() => setDeleteOpen(false)} onDeleted={() => navigate(backTo)} />
@@ -184,20 +204,52 @@ function ConnectionCard({ db }: { db: DbRow }) {
 /* ---------------- Configuration ---------------- */
 
 function ConfigCard({ db }: { db: DbRow }) {
+  const activeProfileId = useSessionStore((s) => s.activeProfileId)
   const [klass, setKlass] = useState(db.Class)
   const [storage, setStorage] = useState(String(db.Storage))
   const [backups, setBackups] = useState(String(db.BackupRetention))
   const [isPublic, setIsPublic] = useState(db.Public)
+  const [multiAz, setMultiAz] = useState(db.MultiAZ)
+  const [protect, setProtect] = useState(db.DeletionProtection)
+  const [autoMinor, setAutoMinor] = useState(db.AutoMinorUpgrade)
+  const [maintWindow, setMaintWindow] = useState(db.MaintenanceWindow)
+  const [backupWindow, setBackupWindow] = useState(db.BackupWindow)
+  const [engineVersion, setEngineVersion] = useState(db.EngineVersion)
   const [password, setPassword] = useState('')
   useEffect(() => {
     setKlass(db.Class)
     setStorage(String(db.Storage))
     setBackups(String(db.BackupRetention))
     setIsPublic(db.Public)
-  }, [db.Class, db.Storage, db.BackupRetention, db.Public])
+    setMultiAz(db.MultiAZ)
+    setProtect(db.DeletionProtection)
+    setAutoMinor(db.AutoMinorUpgrade)
+    setMaintWindow(db.MaintenanceWindow)
+    setBackupWindow(db.BackupWindow)
+    setEngineVersion(db.EngineVersion)
+  }, [db.Class, db.Storage, db.BackupRetention, db.Public, db.MultiAZ, db.DeletionProtection, db.AutoMinorUpgrade, db.MaintenanceWindow, db.BackupWindow, db.EngineVersion])
   const m = useDbMutation(db.Id)
-  const changed = klass !== db.Class || Number(storage) !== db.Storage || Number(backups) !== db.BackupRetention || isPublic !== db.Public || !!password
+
+  // Valid upgrade targets for the current engine version.
+  const upgrades = useQuery({
+    queryKey: ['rds-upgrades', db.Engine, db.EngineVersion, activeProfileId],
+    queryFn: () => runQuery<{ DBEngineVersions?: { ValidUpgradeTarget?: { EngineVersion: string; IsMajorVersionUpgrade?: boolean }[] }[] }>('rds', 'describe_db_engine_versions', { Engine: db.Engine, EngineVersion: db.EngineVersion }),
+    enabled: !!db.Engine && !!db.EngineVersion,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+    meta: { silent: true },
+  })
+  const targets = upgrades.data?.DBEngineVersions?.[0]?.ValidUpgradeTarget ?? []
+  const majorUpgrade = targets.find((t) => t.EngineVersion === engineVersion)?.IsMajorVersionUpgrade
+
+  const changed =
+    klass !== db.Class || Number(storage) !== db.Storage || Number(backups) !== db.BackupRetention || isPublic !== db.Public ||
+    multiAz !== db.MultiAZ || protect !== db.DeletionProtection || autoMinor !== db.AutoMinorUpgrade ||
+    maintWindow !== db.MaintenanceWindow || backupWindow !== db.BackupWindow || engineVersion !== db.EngineVersion || !!password
   const busy = db.Status !== 'available'
+  const windowOk = (v: string, re: RegExp) => !v || re.test(v)
+  const maintOk = windowOk(maintWindow, /^(mon|tue|wed|thu|fri|sat|sun):\d{2}:\d{2}-(mon|tue|wed|thu|fri|sat|sun):\d{2}:\d{2}$/i)
+  const backupOk = windowOk(backupWindow, /^\d{2}:\d{2}-\d{2}:\d{2}$/)
 
   return (
     <Card title="Configuration">
@@ -213,6 +265,12 @@ function ConfigCard({ db }: { db: DbRow }) {
               ...(Number(storage) !== db.Storage ? { AllocatedStorage: Number(storage) } : {}),
               ...(Number(backups) !== db.BackupRetention ? { BackupRetentionPeriod: Number(backups) } : {}),
               ...(isPublic !== db.Public ? { PubliclyAccessible: isPublic } : {}),
+              ...(multiAz !== db.MultiAZ ? { MultiAZ: multiAz } : {}),
+              ...(protect !== db.DeletionProtection ? { DeletionProtection: protect } : {}),
+              ...(autoMinor !== db.AutoMinorUpgrade ? { AutoMinorVersionUpgrade: autoMinor } : {}),
+              ...(maintWindow !== db.MaintenanceWindow ? { PreferredMaintenanceWindow: maintWindow } : {}),
+              ...(backupWindow !== db.BackupWindow ? { PreferredBackupWindow: backupWindow } : {}),
+              ...(engineVersion !== db.EngineVersion ? { EngineVersion: engineVersion, ...(majorUpgrade ? { AllowMajorVersionUpgrade: true } : {}) } : {}),
               ...(password ? { MasterUserPassword: password } : {}),
             },
             success: 'Changes are being applied',
@@ -234,8 +292,32 @@ function ConfigCard({ db }: { db: DbRow }) {
           </div>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="cfg-backups">Backup retention (days)</Label>
-          <Input id="cfg-backups" type="number" min={0} max={35} value={backups} onChange={(e) => setBackups(e.target.value)} />
+          <Label htmlFor="cfg-engine-version">Engine version</Label>
+          <Select value={engineVersion} onValueChange={setEngineVersion}>
+            <SelectTrigger id="cfg-engine-version" className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={db.EngineVersion}>{db.EngineVersion} (current)</SelectItem>
+              {targets.filter((t) => t.EngineVersion !== db.EngineVersion).map((t) => <SelectItem key={t.EngineVersion} value={t.EngineVersion}>{t.EngineVersion}{t.IsMajorVersionUpgrade ? ' — major upgrade' : ''}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <span className={cn('text-xs', majorUpgrade ? 'text-warning' : 'text-muted-foreground')}>
+            {majorUpgrade ? 'Major upgrades can change behaviour — take a snapshot first.' : targets.length ? `${targets.length} upgrade target${targets.length === 1 ? '' : 's'} available.` : upgrades.isPending ? 'Checking upgrade targets…' : 'No upgrade targets available.'}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cfg-backups">Backup retention (days)</Label>
+            <Input id="cfg-backups" type="number" min={0} max={35} value={backups} onChange={(e) => setBackups(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cfg-backup-window">Backup window (UTC)</Label>
+            <Input id="cfg-backup-window" value={backupWindow} onChange={(e) => setBackupWindow(e.target.value)} placeholder="03:00-04:00" className="font-mono text-xs" aria-invalid={!backupOk} />
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="cfg-maint-window">Maintenance window (UTC)</Label>
+          <Input id="cfg-maint-window" value={maintWindow} onChange={(e) => setMaintWindow(e.target.value)} placeholder="sun:05:00-sun:06:00" className="font-mono text-xs" aria-invalid={!maintOk} />
+          {(!maintOk || !backupOk) && <span className="text-xs text-destructive">Windows use the form {!maintOk ? 'ddd:hh:mm-ddd:hh:mm' : 'hh:mm-hh:mm'} (30 minutes minimum).</span>}
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="cfg-password">Reset master password</Label>
@@ -244,19 +326,182 @@ function ConfigCard({ db }: { db: DbRow }) {
             <Button type="button" variant="outline" size="icon" onClick={() => setPassword(generatePassword())} aria-label="Generate a new password"><RefreshCw /></Button>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-          <div>
-            <Label htmlFor="cfg-public">Publicly accessible</Label>
-            <p className="mt-0.5 text-xs text-muted-foreground">Expose a public IP for connections from outside the VPC.</p>
-          </div>
-          <Switch id="cfg-public" checked={isPublic} onCheckedChange={setIsPublic} />
+        <div className="grid gap-2 sm:grid-cols-2">
+          <ToggleRow id="cfg-public" label="Publicly accessible" hint="Public IP for connections from outside the VPC." checked={isPublic} onChange={setIsPublic} />
+          <ToggleRow id="cfg-multiaz" label="Multi-AZ standby" hint="Synchronous replica in another zone for failover." checked={multiAz} onChange={setMultiAz} />
+          <ToggleRow id="cfg-protect" label="Deletion protection" hint="Blocks deleting the instance until turned off." checked={protect} onChange={setProtect} />
+          <ToggleRow id="cfg-autominor" label="Auto minor upgrades" hint="Apply minor engine versions in the maintenance window." checked={autoMinor} onChange={setAutoMinor} />
         </div>
         <div className="flex items-center gap-3">
-          <Button type="submit" disabled={!changed || m.isPending || busy}>{m.isPending ? 'Applying…' : 'Apply changes'}</Button>
+          <Button type="submit" disabled={!changed || !maintOk || !backupOk || m.isPending || busy}>{m.isPending ? 'Applying…' : 'Apply changes'}</Button>
           {busy && <span className="text-xs text-warning">Available only while the database is running.</span>}
         </div>
         {m.isError && <ErrorAlert error={m.error} />}
       </form>
+    </Card>
+  )
+}
+
+function ToggleRow({ id, label, hint, checked, onChange }: { id: string; label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+      <div className="min-w-0">
+        <Label htmlFor={id}>{label}</Label>
+        <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+      </div>
+      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+    </div>
+  )
+}
+
+/* ---------------- Name (inline rename) ---------------- */
+
+function NameEditor({ db, onRenamed }: { db: DbRow; onRenamed: (next: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(db.Id)
+  const skipSave = useRef(false)
+  const m = useDbMutation(db.Id)
+  useEffect(() => setName(db.Id), [db.Id])
+
+  function commit() {
+    if (skipSave.current) {
+      skipSave.current = false
+      setName(db.Id)
+      setEditing(false)
+      return
+    }
+    const next = name.trim()
+    setEditing(false)
+    if (!next || next === db.Id) {
+      setName(db.Id)
+      return
+    }
+    const problem = validateDbIdentifier(next)
+    if (problem) {
+      toast.error(problem)
+      setName(db.Id)
+      return
+    }
+    m.mutate(
+      { op: 'modify_db_instance', params: { DBInstanceIdentifier: db.Id, NewDBInstanceIdentifier: next, ApplyImmediately: true }, success: `Renaming to “${next}”…` },
+      { onSuccess: () => onRenamed(next), onError: () => setName(db.Id) },
+    )
+  }
+
+  return editing ? (
+    <input
+      autoFocus
+      value={name}
+      onChange={(e) => setName(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        if (e.key === 'Escape') {
+          skipSave.current = true
+          e.currentTarget.blur()
+        }
+      }}
+      aria-label="Database name"
+      className="-mx-1 min-w-0 max-w-xs rounded border-0 bg-transparent px-1 py-0.5 text-lg font-semibold outline-none ring-2 ring-ring/50"
+    />
+  ) : (
+    <h1 onClick={() => db.Status === 'available' && setEditing(true)} title={db.Status === 'available' ? 'Click to rename' : undefined} className={cn('-mx-1 truncate rounded px-1 text-lg font-semibold', db.Status === 'available' && 'cursor-text hover:bg-muted')}>
+      {db.Id}
+    </h1>
+  )
+}
+
+/* ---------------- Firewall / security groups ---------------- */
+
+function FirewallCard({ db }: { db: DbRow }) {
+  const activeProfileId = useSessionStore((s) => s.activeProfileId)
+  const region = useSessionStore((s) => s.region)
+  const attached = db.SecurityGroups.map((g) => g.id)
+  const [selected, setSelected] = useState<string[]>(attached)
+  useEffect(() => setSelected(db.SecurityGroups.map((g) => g.id)), [db.SecurityGroups])
+  const m = useDbMutation(db.Id)
+  const groups = useQuery({
+    queryKey: ['ec2-security-groups', db.VpcId || 'all', region, activeProfileId],
+    queryFn: () => runQuery<{ SecurityGroups?: { GroupId: string; GroupName: string; Description?: string }[] }>('ec2', 'describe_security_groups', db.VpcId ? { Filters: [{ Name: 'vpc-id', Values: [db.VpcId] }] } : {}),
+    retry: false,
+  })
+  const list = groups.data?.SecurityGroups ?? []
+  const changed = selected.length !== attached.length || selected.some((id) => !attached.includes(id))
+  const toggle = (id: string) => setSelected((cur) => (cur.includes(id) ? cur.filter((g) => g !== id) : [...cur, id]))
+
+  return (
+    <Card title={<span className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary" />Firewall</span>}>
+      {groups.isPending ? <Skeleton className="h-16 w-full" /> : groups.isError ? <ErrorAlert error={groups.error} /> : list.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No security groups found{db.VpcId ? ' in this VPC' : ''}.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">Security groups control which hosts can reach port {db.Port || 'the database port'}.</p>
+          <div className="flex max-h-48 flex-col gap-1 overflow-y-auto">
+            {list.map((g) => (
+              <Label key={g.GroupId} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm font-normal hover:bg-muted">
+                <Checkbox checked={selected.includes(g.GroupId)} onCheckedChange={() => toggle(g.GroupId)} />
+                <span className="min-w-0">
+                  <span className="font-medium">{g.GroupName}</span>
+                  <span className="ml-1 font-mono text-xs text-muted-foreground">{g.GroupId}</span>
+                  {db.SecurityGroups.find((x) => x.id === g.GroupId)?.status && db.SecurityGroups.find((x) => x.id === g.GroupId)!.status !== 'active' && <Badge variant="outline" className="ml-2 text-[10px]">{db.SecurityGroups.find((x) => x.id === g.GroupId)!.status}</Badge>}
+                </span>
+              </Label>
+            ))}
+          </div>
+          <div>
+            <Button size="sm" disabled={!changed || selected.length === 0 || m.isPending} onClick={() => m.mutate({ op: 'modify_db_instance', params: { DBInstanceIdentifier: db.Id, VpcSecurityGroupIds: selected, ApplyImmediately: true }, success: 'Firewall changes applied' })}>
+              {m.isPending ? 'Applying…' : 'Apply firewall changes'}
+            </Button>
+          </div>
+          {m.isError && <ErrorAlert error={m.error} />}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+/* ---------------- Log files ---------------- */
+
+function LogsCard({ db }: { db: DbRow }) {
+  const activeProfileId = useSessionStore((s) => s.activeProfileId)
+  const region = useSessionStore((s) => s.region)
+  const [file, setFile] = useState<string>('')
+  const files = useQuery({
+    queryKey: ['rds-logfiles', db.Id, region, activeProfileId],
+    queryFn: () => runQuery<{ DescribeDBLogFiles?: { LogFileName: string; LastWritten?: number; Size?: number }[] }>('rds', 'describe_db_log_files', { DBInstanceIdentifier: db.Id }),
+    retry: false,
+    meta: { silent: true },
+  })
+  const list = (files.data?.DescribeDBLogFiles ?? []).sort((a, b) => (b.LastWritten ?? 0) - (a.LastWritten ?? 0))
+  const current = file || list[0]?.LogFileName || ''
+  const content = useQuery({
+    queryKey: ['rds-logfile', db.Id, current, region, activeProfileId],
+    queryFn: () => runQuery<{ LogFileData?: string; AdditionalDataPending?: boolean }>('rds', 'download_db_log_file_portion', { DBInstanceIdentifier: db.Id, LogFileName: current, NumberOfLines: 200 }),
+    enabled: !!current,
+    retry: false,
+  })
+  return (
+    <Card
+      title={<span className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" />Log files</span>}
+      actions={
+        <div className="flex items-center gap-2">
+          {list.length > 0 && (
+            <Select value={current} onValueChange={setFile}>
+              <SelectTrigger size="sm" className="w-64 font-mono text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>{list.map((f) => <SelectItem key={f.LogFileName} value={f.LogFileName} className="font-mono text-xs">{f.LogFileName}</SelectItem>)}</SelectContent>
+            </Select>
+          )}
+          <Button variant="ghost" size="xs" onClick={() => { files.refetch(); content.refetch() }} disabled={files.isFetching || content.isFetching}><RefreshCw className={cn((files.isFetching || content.isFetching) && 'animate-spin')} />Refresh</Button>
+        </div>
+      }
+    >
+      {files.isPending ? <Skeleton className="h-24 w-full" /> : files.isError ? (
+        <p className="text-sm text-muted-foreground">Log files are not available for this database{db.Status !== 'available' ? ` while it is ${db.Status}` : ''}.</p>
+      ) : list.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No log files yet.</p>
+      ) : content.isError ? <ErrorAlert error={content.error} /> : content.isPending ? <Skeleton className="h-24 w-full" /> : (
+        <Textarea readOnly value={content.data?.LogFileData?.trim() || '(empty)'} rows={12} spellCheck={false} className="resize-y bg-gray-950 font-mono text-[11px] leading-relaxed text-gray-200" />
+      )}
     </Card>
   )
 }

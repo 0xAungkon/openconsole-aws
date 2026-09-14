@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, Plus, RefreshCw, Search, Trash2, X, Zap } from 'lucide-react'
+import { Check, Copy, Play, Plus, RefreshCw, Search, Trash2, X, Zap } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -37,6 +37,7 @@ import { RoleInput } from '../components/RoleInput'
 import { timeAgo } from '../lib/ec2'
 import { RUNTIMES, flattenFunctions, runtimeLabel, validateFunctionName, zipSourceBase64, type FunctionRow } from '../lib/lambda'
 import { bytesParam, fileToBase64, formatBytes } from '../lib/s3'
+import { prettyJson } from '../lib/lambda'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
@@ -52,6 +53,7 @@ export function FunctionsPage() {
 
   const [search, setSearch] = useState('')
   const [runtime, setRuntime] = useState('all')
+  const [state, setState] = useState('all')
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteName, setDeleteName] = useState<string | null>(null)
   const [page, setPage] = useState(1)
@@ -71,23 +73,41 @@ export function FunctionsPage() {
       return flattenFunctions({ Functions: all })
     },
     enabled: !needsProfile,
+    refetchInterval: (q) => (q.state.data?.some((f) => f.State === 'Pending') ? 5000 : false),
   })
   const rows = useMemo(() => query.data ?? [], [query.data])
+  const states = useMemo(() => [...new Set(rows.map((r) => r.State).filter(Boolean))].sort(), [rows])
   const runtimes = useMemo(() => [...new Set(rows.map((r) => r.Runtime).filter(Boolean))].sort(), [rows])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return rows.filter((r) => (runtime === 'all' || r.Runtime === runtime) && (!q || r.FunctionName.toLowerCase().includes(q)))
-  }, [rows, search, runtime])
+    return rows.filter((r) => (runtime === 'all' || r.Runtime === runtime) && (state === 'all' || r.State === state) && (!q || r.FunctionName.toLowerCase().includes(q)))
+  }, [rows, search, runtime, state])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  useEffect(() => setPage(1), [search, runtime, region])
+  useEffect(() => setPage(1), [search, runtime, state, region])
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
   const paged = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page])
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['lambda-functions'] })
+
+  const quickInvoke = useMutation({
+    mutationFn: async (name: string) => {
+      const r = await runQuery<{ StatusCode: number; FunctionError?: string; Payload?: string }>('lambda', 'invoke', {
+        FunctionName: name,
+        InvocationType: 'RequestResponse',
+        Payload: bytesParam(btoa('{}')),
+      })
+      return { name, ...r }
+    },
+    onSuccess: (r) => {
+      const body = prettyJson(r.Payload ?? '').slice(0, 300)
+      if (r.FunctionError) toast.error(`${r.name} returned ${r.FunctionError}`, { description: body })
+      else toast.success(`${r.name} invoked (HTTP ${r.StatusCode})`, { description: body })
+    },
+  })
 
   const remove = useMutation({
     mutationFn: (name: string) => runQuery('lambda', 'delete_function', { FunctionName: name }),
@@ -125,6 +145,21 @@ export function FunctionsPage() {
                 {runtimes.map((r) => (
                   <SelectItem key={r} value={r}>
                     {runtimeLabel(r)} ({rows.filter((x) => x.Runtime === r).length})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {states.length > 1 && (
+            <Select value={state} onValueChange={setState}>
+              <SelectTrigger aria-label="Filter by state" className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All states</SelectItem>
+                {states.map((st) => (
+                  <SelectItem key={st} value={st}>
+                    {st} ({rows.filter((x) => x.State === st).length})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -195,8 +230,9 @@ export function FunctionsPage() {
                       <FunctionRowView
                         key={f.FunctionArn || f.FunctionName}
                         fn={f}
-                        busy={remove.isPending && remove.variables === f.FunctionName}
+                        busy={(remove.isPending && remove.variables === f.FunctionName) || (quickInvoke.isPending && quickInvoke.variables === f.FunctionName)}
                         onOpen={() => navigate(`/${profile}/functions/${encodeURIComponent(f.FunctionName)}`)}
+                        onInvoke={() => quickInvoke.mutate(f.FunctionName)}
                         onDelete={() => setDeleteName(f.FunctionName)}
                       />
                     ))}
@@ -256,7 +292,7 @@ export function StateBadgeLambda({ state }: { state: string }) {
   return <Badge variant="secondary" className={cn('border-transparent', tone)}>{state || 'Unknown'}</Badge>
 }
 
-function FunctionRowView({ fn, busy, onOpen, onDelete }: { fn: FunctionRow; busy: boolean; onOpen: () => void; onDelete: () => void }) {
+function FunctionRowView({ fn, busy, onOpen, onInvoke, onDelete }: { fn: FunctionRow; busy: boolean; onOpen: () => void; onInvoke: () => void; onDelete: () => void }) {
   const [copied, setCopied] = useState(false)
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   async function copyArn(e: React.MouseEvent) {
@@ -295,6 +331,14 @@ function FunctionRowView({ fn, busy, onOpen, onDelete }: { fn: FunctionRow; busy
       <TableCell className="px-4">
         <div className="flex items-center justify-end gap-1">
           <Button variant="outline" size="xs" onClick={(e) => { stop(e); onOpen() }}>Open</Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon-sm" disabled={busy || fn.State !== 'Active'} onClick={(e) => { stop(e); onInvoke() }} aria-label="Invoke with an empty event" className="text-green-600 hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-950/40">
+                <Play />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Invoke with {'{}'}</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon-sm" disabled={busy} onClick={(e) => { stop(e); onDelete() }} aria-label="Delete function" className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40">

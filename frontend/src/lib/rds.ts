@@ -14,6 +14,10 @@ export interface DbRow {
   MultiAZ: boolean
   Public: boolean
   BackupRetention: number
+  DeletionProtection: boolean
+  MaintenanceWindow: string
+  BackupWindow: string
+  AutoMinorUpgrade: boolean
   VpcId: string
   SecurityGroups: { id: string; status: string }[]
   AZ: string
@@ -38,6 +42,10 @@ export function toDbRow(d: any): DbRow {
     MultiAZ: !!d.MultiAZ,
     Public: !!d.PubliclyAccessible,
     BackupRetention: d.BackupRetentionPeriod ?? 0,
+    DeletionProtection: !!d.DeletionProtection,
+    MaintenanceWindow: d.PreferredMaintenanceWindow ?? '',
+    BackupWindow: d.PreferredBackupWindow ?? '',
+    AutoMinorUpgrade: !!d.AutoMinorVersionUpgrade,
     VpcId: d.DBSubnetGroup?.VpcId ?? '',
     SecurityGroups: (d.VpcSecurityGroups ?? []).map((g: any) => ({ id: g.VpcSecurityGroupId, status: g.Status })),
     AZ: d.AvailabilityZone ?? '',

@@ -211,3 +211,48 @@ def test_lambda_code_unknown_function(client):
     )
     assert r.status_code == 400
     assert r.json()["ok"] is False
+
+
+def test_proxy_wraps_unexpected_client_exceptions(client, monkeypatch):
+    """Non-boto exceptions from the SDK call (e.g. an HTML 500 that fails to
+    parse) become a normal proxy error payload rather than a bare 500."""
+    from botocore.parsers import ResponseParserError
+
+    from app.services import aws_proxy
+
+    class _Client:
+        def describe_db_log_files(self, **_):
+            raise ResponseParserError("Unable to parse response, invalid XML received")
+
+    monkeypatch.setattr(aws_proxy.boto3, "client", lambda *a, **k: _Client())
+    r = client.post(
+        "/api/proxy",
+        json={"service": "rds", "operation": "describe_db_log_files", "region": "us-east-1", "credentials": GUEST_CREDS},
+    )
+    assert r.status_code == 502
+    body = r.json()
+    assert body["ok"] is False
+    assert body["error"]["code"] == "ResponseParserError"
+
+
+def test_unhandled_error_has_cors_headers(client, monkeypatch):
+    """The catch-all 500 must carry CORS headers for allowed origins."""
+    from app.routes import proxy as proxy_route
+
+    def boom(**_):
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setattr(proxy_route.aws_proxy, "run_query", boom)
+    from starlette.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.post(
+        "/api/proxy",
+        json={"service": "s3", "operation": "list_buckets", "region": "us-east-1", "credentials": GUEST_CREDS},
+        headers={"Origin": "http://localhost:5173"},
+    )
+    assert r.status_code == 500
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    assert r.json()["detail"] == "RuntimeError: kaboom"

@@ -146,6 +146,14 @@ def run_query(
         raise ProxyExecutionError(
             ProxyError(code="InvalidRequest", message=str(exc)), status_code=400
         )
+    except ProxyExecutionError:
+        raise
+    except Exception as exc:
+        # e.g. botocore.parsers.ResponseParserError when an endpoint answers with
+        # HTML instead of XML/JSON — surface it as a normal proxy error payload.
+        raise ProxyExecutionError(
+            ProxyError(code=type(exc).__name__, message=str(exc)), status_code=502
+        )
 
     result = _json_safe(raw)
     # ResponseMetadata is transport noise; drop it from the payload we return.
