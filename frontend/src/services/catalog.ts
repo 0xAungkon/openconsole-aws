@@ -44,7 +44,27 @@ export const CATALOG: ServiceDef[] = [
         id: 'run_instances',
         label: 'Launch',
         kind: 'mutation',
+        toParams: ({ Name, ...params }) =>
+          typeof Name === 'string' && Name.trim()
+            ? {
+                ...params,
+                TagSpecifications: [
+                  {
+                    ResourceType: 'instance',
+                    Tags: [{ Key: 'Name', Value: Name.trim() }],
+                  },
+                ],
+              }
+            : params,
         fields: [
+          {
+            name: 'Name',
+            label: 'Server name',
+            suggestions: 'codename',
+            type: 'string',
+            required: true,
+            help: 'Shown in your server list (stored as the "Name" tag). Edit it or generate another.',
+          },
           {
             name: 'ImageId',
             label: 'Server image (operating system)',

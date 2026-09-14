@@ -50,7 +50,8 @@ export interface ActionField {
   help?: string
   /** Prefilled value for the input (e.g. a sensible default instance type). */
   default?: string
-  suggestions?: 'ami' | 'instance-type'
+  /** 'codename' prefills a friendly auto-generated name (e.g. "cosmic-falcon"). */
+  suggestions?: 'ami' | 'instance-type' | 'codename'
 }
 
 export interface Column {
@@ -70,6 +71,8 @@ export interface ServiceAction {
   getRows?: (result: any) => Row[]
   columns?: Column[]
   description?: string
+  /** Reshape the form values into the boto3 params (e.g. a Name field → TagSpecifications). */
+  toParams?: (params: Record<string, unknown>) => Record<string, unknown>
 }
 
 export interface ServiceDef {

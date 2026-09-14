@@ -5,7 +5,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { ActionField, ServiceAction } from '../types'
 import { AmiInput } from './AmiInput'
+import { CodenameInput } from './CodenameInput'
 import { InstanceTypeInput } from './InstanceTypeInput'
+import { generateCodename } from '../lib/codename'
 
 interface ActionFormProps {
   action: ServiceAction
@@ -46,7 +48,10 @@ function buildParams(
 
 function initialValues(fields: ActionField[]): Record<string, string> {
   const v: Record<string, string> = {}
-  for (const f of fields) if (f.default != null) v[f.name] = f.default
+  for (const f of fields) {
+    if (f.default != null) v[f.name] = f.default
+    else if (f.suggestions === 'codename') v[f.name] = generateCodename()
+  }
   return v
 }
 
@@ -78,7 +83,7 @@ export function ActionForm({ action, running, onRun }: ActionFormProps) {
         }
       }
     }
-    onRun(params)
+    onRun(action.toParams ? action.toParams(params) : params)
   }
 
   const set = (name: string) => (value: string) => setValues((v) => ({ ...v, [name]: value }))
@@ -96,7 +101,15 @@ export function ActionForm({ action, running, onRun }: ActionFormProps) {
             {f.label}
             {f.required && <span className="text-destructive">*</span>}
           </Label>
-          {f.suggestions === 'ami' ? (
+          {f.suggestions === 'codename' ? (
+            <CodenameInput
+              id={`field-${f.name}`}
+              value={values[f.name] ?? ''}
+              required={f.required}
+              placeholder={f.placeholder}
+              onChange={set(f.name)}
+            />
+          ) : f.suggestions === 'ami' ? (
             <AmiInput
               id={`field-${f.name}`}
               value={values[f.name] ?? ''}
