@@ -7,7 +7,9 @@ import App from './App.tsx'
 import './index.css'
 import { errorMessage } from './lib/errors'
 import { startHistorySync } from './store/historySync'
+import { startThemeSync } from './store/themeStore'
 
+startThemeSync()
 startHistorySync()
 
 // Every failed query/mutation surfaces as an error toast, unless it opts out

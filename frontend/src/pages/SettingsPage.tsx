@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { deleteProfile, listProfiles } from '../api/auth'
 import { Card } from '../components/Card'
 import { ProfileForm } from '../components/ProfileForm'
+import { ThemeSettingsCard } from '../components/ThemeSettingsCard'
 import { slugify } from '../lib/slug'
 import type { StoredProfile } from '../types'
 import { useAuthStore } from '../store/authStore'
@@ -44,18 +45,22 @@ export function SettingsPage() {
 
   if (mode === 'guest') {
     return (
-      <Card title="Settings">
-        <p className="text-sm text-muted-foreground">
-          You're in guest mode. Credentials are stored only in this browser. Use
-          the endpoint control in the bottom bar to target a local endpoint, or
-          log out to switch accounts.
-        </p>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card title="Settings">
+          <p className="text-sm text-muted-foreground">
+            You're in guest mode. Credentials are stored only in this browser. Use
+            the endpoint control in the bottom bar to target a local endpoint, or
+            log out to switch accounts.
+          </p>
+        </Card>
+        <ThemeSettingsCard />
+      </div>
     )
   }
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      <ThemeSettingsCard />
       <Card title="Stored AWS profiles">
         {profiles.isLoading ? (
           <div className="flex flex-col gap-3">

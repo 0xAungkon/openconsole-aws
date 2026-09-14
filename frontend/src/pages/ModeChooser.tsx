@@ -1,7 +1,7 @@
-import { Hexagon, Lock, Rocket } from 'lucide-react'
+import { Lock, Rocket } from 'lucide-react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BRAND_BADGE, BRAND_NAME } from '../brand'
+import { BrandLogo } from '../components/BrandLogo'
 import { useAuthStore } from '../store/authStore'
 
 function ModeCard({
@@ -40,9 +40,8 @@ export function ModeChooser() {
     <div className="flex min-h-full items-center justify-center p-6">
       <div className="w-full max-w-2xl">
         <div className="mb-8 text-center">
-          <Hexagon className="mx-auto h-10 w-10 text-primary" />
-          <h1 className="mt-2 text-2xl font-semibold">
-            {BRAND_BADGE} {BRAND_NAME}
+          <h1>
+            <BrandLogo size="lg" />
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage AWS services through a friendly interface.

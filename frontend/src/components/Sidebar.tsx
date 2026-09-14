@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { BRAND_BADGE, BRAND_NAME } from '../brand'
+import { BrandLogo } from './BrandLogo'
 import { CATALOG } from '../services/catalog'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
@@ -78,19 +78,7 @@ export function Sidebar() {
       )}
     >
       <div className="flex items-center justify-between px-3 py-4">
-        {!sidebarCollapsed ? (
-          <div className="flex items-center gap-2">
-            <Hexagon className="h-5 w-5 shrink-0 text-primary" />
-            <span className="text-sm font-semibold leading-tight text-foreground">
-              {BRAND_NAME}
-              <sup className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
-                {BRAND_BADGE}
-              </sup>
-            </span>
-          </div>
-        ) : (
-          <Hexagon className="h-5 w-5 text-primary" />
-        )}
+        {!sidebarCollapsed ? <BrandLogo /> : <Hexagon className="h-5 w-5 text-primary" />}
         <Button
           variant="ghost"
           size="icon-sm"

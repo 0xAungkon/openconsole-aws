@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { BrandLogo } from '../components/BrandLogo'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { testConnection } from '../api/proxy'
 import { CredentialForm, type CredentialValues } from '../components/CredentialForm'
@@ -47,6 +48,9 @@ export function GuestCredentials() {
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-md">
         <CardHeader>
+          <div className="mb-3 flex justify-center">
+            <BrandLogo size="lg" />
+          </div>
           <CardTitle>Guest credentials</CardTitle>
           <CardDescription>
             Stored only in this browser (localStorage) and sent with each request. Never

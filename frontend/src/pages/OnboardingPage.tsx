@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { BrandLogo } from '../components/BrandLogo'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { listProfiles } from '../api/auth'
 import { ProfileForm } from '../components/ProfileForm'
@@ -41,6 +42,9 @@ export function OnboardingPage() {
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-md">
         <CardHeader>
+          <div className="mb-3 flex justify-center">
+            <BrandLogo size="lg" />
+          </div>
           <CardTitle>Add your first AWS profile</CardTitle>
           <CardDescription>
             To start issuing queries, provide AWS credentials. They are encrypted at rest
