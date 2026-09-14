@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './pages/AppLayout'
 import { AuthPage } from './pages/AuthPage'
+import { BucketPage } from './pages/BucketPage'
 import { Ec2InstancePage } from './pages/Ec2InstancePage'
 import { Ec2Page } from './pages/Ec2Page'
 import { ModeChooser } from './pages/ModeChooser'
@@ -10,6 +11,7 @@ import { OnboardingPage } from './pages/OnboardingPage'
 import { Overview } from './pages/Overview'
 import { ServicePage } from './pages/ServicePage'
 import { SettingsPage } from './pages/SettingsPage'
+import { StoragePage } from './pages/StoragePage'
 import { useAuthStore } from './store/authStore'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -53,6 +55,8 @@ export default function App() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="compute" element={<Ec2Page />} />
         <Route path="compute/:instanceId" element={<Ec2InstancePage />} />
+        <Route path="storage" element={<StoragePage />} />
+        <Route path="storage/:bucket" element={<BucketPage />} />
         <Route path=":service" element={<ServicePage />} />
       </Route>
 

@@ -110,3 +110,48 @@ def test_proxy_register_mode_uses_stored_profile(client):
     assert r.status_code == 200, r.text
     names = [b["Name"] for b in r.json()["result"]["Buckets"]]
     assert "reg-bucket" in names
+
+
+@mock_aws
+def test_proxy_decodes_base64_bytes_params(client):
+    """{"__bytes_base64__": ...} params become bytes (used for S3 uploads)."""
+    import base64
+
+    boto3.client("s3", region_name="us-east-1").create_bucket(Bucket="up-bucket")
+    payload = b"\x00\x01binary\xff"
+    r = client.post(
+        "/api/proxy",
+        json={
+            "service": "s3",
+            "operation": "put_object",
+            "region": "us-east-1",
+            "credentials": GUEST_CREDS,
+            "params": {
+                "Bucket": "up-bucket",
+                "Key": "dir/file.bin",
+                "Body": {"__bytes_base64__": base64.b64encode(payload).decode()},
+                "ContentType": "application/octet-stream",
+            },
+        },
+    )
+    assert r.status_code == 200, r.text
+    stored = boto3.client("s3", region_name="us-east-1").get_object(
+        Bucket="up-bucket", Key="dir/file.bin"
+    )
+    assert stored["Body"].read() == payload
+
+
+@mock_aws
+def test_proxy_rejects_invalid_base64(client):
+    r = client.post(
+        "/api/proxy",
+        json={
+            "service": "s3",
+            "operation": "put_object",
+            "region": "us-east-1",
+            "credentials": GUEST_CREDS,
+            "params": {"Bucket": "b", "Key": "k", "Body": {"__bytes_base64__": "not base64!"}},
+        },
+    )
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "InvalidRequest"

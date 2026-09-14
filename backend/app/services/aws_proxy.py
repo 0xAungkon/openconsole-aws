@@ -62,6 +62,28 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
+# JSON can't carry raw bytes, so the frontend wraps binary values (e.g. an S3
+# object body) as {"__bytes_base64__": "<base64>"}; we decode them here.
+_BYTES_KEY = "__bytes_base64__"
+
+
+def _decode_params(value: Any) -> Any:
+    """Recursively replace {"__bytes_base64__": ...} markers with bytes."""
+    if isinstance(value, dict):
+        if set(value.keys()) == {_BYTES_KEY} and isinstance(value[_BYTES_KEY], str):
+            try:
+                return base64.b64decode(value[_BYTES_KEY], validate=True)
+            except (ValueError, TypeError) as exc:
+                raise ProxyExecutionError(
+                    ProxyError(code="InvalidRequest", message=f"Invalid base64 body: {exc}"),
+                    status_code=400,
+                )
+        return {k: _decode_params(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_decode_params(v) for v in value]
+    return value
+
+
 def run_query(
     *,
     service: str,
@@ -98,7 +120,7 @@ def run_query(
         )
 
     try:
-        raw = method(**(params or {}))
+        raw = method(**_decode_params(params or {}))
     except ClientError as exc:
         err = exc.response.get("Error", {})
         raise ProxyExecutionError(

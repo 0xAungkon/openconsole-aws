@@ -71,7 +71,7 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar title={titleFor(location.pathname)} />
 
-        <main className={`flex-1 overflow-y-auto p-4 ${location.pathname.split('/').filter(Boolean)[1] === 'compute' ? 'bg-card sm:p-6' : ''}`}>
+        <main className={`flex-1 overflow-y-auto p-4 ${['compute', 'storage'].includes(location.pathname.split('/').filter(Boolean)[1] ?? '') ? 'bg-card sm:p-6' : ''}`}>
           <Outlet />
         </main>
 
