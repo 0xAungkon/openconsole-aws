@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './pages/AppLayout'
 import { AuthPage } from './pages/AuthPage'
 import { BucketPage } from './pages/BucketPage'
+import { DatabasePage } from './pages/DatabasePage'
+import { DatabasesPage } from './pages/DatabasesPage'
 import { Ec2InstancePage } from './pages/Ec2InstancePage'
 import { Ec2Page } from './pages/Ec2Page'
 import { FunctionPage } from './pages/FunctionPage'
@@ -61,6 +63,8 @@ export default function App() {
         <Route path="storage/:bucket" element={<BucketPage />} />
         <Route path="functions" element={<FunctionsPage />} />
         <Route path="functions/:name" element={<FunctionPage />} />
+        <Route path="databases" element={<DatabasesPage />} />
+        <Route path="databases/:id" element={<DatabasePage />} />
         <Route path=":service" element={<ServicePage />} />
       </Route>
 
