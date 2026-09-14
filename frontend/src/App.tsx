@@ -16,6 +16,8 @@ import { Overview } from './pages/Overview'
 import { ServicePage } from './pages/ServicePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StoragePage } from './pages/StoragePage'
+import { TablePage } from './pages/TablePage'
+import { TablesPage } from './pages/TablesPage'
 import { useAuthStore } from './store/authStore'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -65,6 +67,8 @@ export default function App() {
         <Route path="functions/:name" element={<FunctionPage />} />
         <Route path="databases" element={<DatabasesPage />} />
         <Route path="databases/:id" element={<DatabasePage />} />
+        <Route path="nosql" element={<TablesPage />} />
+        <Route path="nosql/:table" element={<TablePage />} />
         <Route path=":service" element={<ServicePage />} />
       </Route>
 
