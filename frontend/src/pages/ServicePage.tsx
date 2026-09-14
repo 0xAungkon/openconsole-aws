@@ -1,6 +1,10 @@
 import { useMutation } from '@tanstack/react-query'
+import { CircleCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { runQuery } from '../api/proxy'
 import { ActionForm } from '../components/ActionForm'
 import { Card } from '../components/Card'
@@ -29,6 +33,15 @@ export function ServicePage() {
   const run = useMutation({
     mutationFn: (params: Record<string, unknown>) =>
       runQuery(def!.key, action!.id, params),
+    onSuccess: (data) => {
+      if (!action) return
+      if (action.kind === 'list' && action.getRows) {
+        const n = action.getRows(data).length
+        toast.success(`${action.label}: ${n} result${n === 1 ? '' : 's'}`)
+      } else {
+        toast.success(`${action.label} completed`)
+      }
+    },
   })
 
   // Re-run list actions automatically when region changes if we already have data.
@@ -48,31 +61,28 @@ export function ServicePage() {
       <Card
         title={
           <span className="flex items-center gap-2">
-            <def.icon className="h-4 w-4 text-brand-500" />
+            <def.icon className="h-4 w-4 text-primary" />
             {def.label}
           </span>
         }
         actions={
           <div className="flex flex-wrap gap-1">
             {def.actions.map((a) => (
-              <button
+              <Button
                 key={a.id}
-                type="button"
+                size="xs"
+                variant={a.id === actionId ? 'default' : 'secondary'}
+                aria-pressed={a.id === actionId}
                 onClick={() => setActionId(a.id)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  a.id === actionId
-                    ? 'bg-brand-500 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300'
-                }`}
               >
                 {a.label}
-              </button>
+              </Button>
             ))}
           </div>
         }
       >
         {needsProfile ? (
-          <p className="text-sm text-amber-600">
+          <p className="text-sm text-warning">
             Select an AWS profile from the account menu to run queries.
           </p>
         ) : (
@@ -93,9 +103,13 @@ export function ServicePage() {
           ) : action?.kind === 'list' && action.getRows && action.columns ? (
             <DataTable columns={action.columns} rows={action.getRows(run.data)} />
           ) : (
-            <p className="text-sm text-green-600">
-              Request completed successfully — open the Inspector below for full details.
-            </p>
+            <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
+              <CircleCheck />
+              <AlertTitle>Request completed successfully</AlertTitle>
+              <AlertDescription className="text-current/80">
+                Open the Inspector below for full details.
+              </AlertDescription>
+            </Alert>
           )}
         </Card>
       )}

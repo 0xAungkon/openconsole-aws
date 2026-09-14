@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import type { ActionField, ServiceAction } from '../types'
 import { AmiInput } from './AmiInput'
 import { InstanceTypeInput } from './InstanceTypeInput'
@@ -77,67 +81,60 @@ export function ActionForm({ action, running, onRun }: ActionFormProps) {
     onRun(params)
   }
 
+  const set = (name: string) => (value: string) => setValues((v) => ({ ...v, [name]: value }))
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
       {action.fields.length === 0 && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           No parameters required — run to fetch results.
         </p>
       )}
       {action.fields.map((f) => (
-        <div key={f.name} className="flex flex-col gap-1 text-sm">
-          <label htmlFor={`field-${f.name}`} className="font-medium text-gray-700 dark:text-gray-200">
+        <div key={f.name} className="flex flex-col gap-1.5">
+          <Label htmlFor={`field-${f.name}`}>
             {f.label}
-            {f.required && <span className="text-red-500"> *</span>}
-          </label>
+            {f.required && <span className="text-destructive">*</span>}
+          </Label>
           {f.suggestions === 'ami' ? (
             <AmiInput
               id={`field-${f.name}`}
               value={values[f.name] ?? ''}
               required={f.required}
-              onChange={(value) => setValues((v) => ({ ...v, [f.name]: value }))}
+              onChange={set(f.name)}
             />
           ) : f.suggestions === 'instance-type' ? (
             <InstanceTypeInput
               id={`field-${f.name}`}
               value={values[f.name] ?? ''}
               required={f.required}
-              onChange={(value) => setValues((v) => ({ ...v, [f.name]: value }))}
+              onChange={set(f.name)}
             />
           ) : f.type === 'json' ? (
-            <textarea
+            <Textarea
               id={`field-${f.name}`}
               value={values[f.name] ?? ''}
               placeholder={f.placeholder}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, [f.name]: e.target.value }))
-              }
+              onChange={(e) => set(f.name)(e.target.value)}
               rows={4}
-              className="rounded-md border border-gray-300 px-3 py-2 font-mono text-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+              className="font-mono text-xs"
             />
           ) : (
-            <input
+            <Input
               id={`field-${f.name}`}
               value={values[f.name] ?? ''}
               placeholder={f.placeholder}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, [f.name]: e.target.value }))
-              }
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+              onChange={(e) => set(f.name)(e.target.value)}
             />
           )}
-          {f.help && <span className="text-xs text-gray-400">{f.help}</span>}
+          {f.help && <span className="text-xs text-muted-foreground">{f.help}</span>}
         </div>
       ))}
-      {jsonError && <p className="text-sm text-red-600">{jsonError}</p>}
+      {jsonError && <p className="text-sm text-destructive">{jsonError}</p>}
       <div>
-        <button
-          type="submit"
-          disabled={running}
-          className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-60"
-        >
+        <Button type="submit" disabled={running}>
           {running ? 'Running…' : 'Run'}
-        </button>
+        </Button>
       </div>
     </form>
   )

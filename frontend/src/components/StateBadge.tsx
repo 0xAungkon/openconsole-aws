@@ -1,3 +1,5 @@
+import { cn } from 'cn'
+import { Badge } from '@/components/ui/badge'
 import { stateLabel, stateTone } from '../lib/ec2'
 
 const TONES: Record<string, { dot: string; pill: string }> = {
@@ -7,7 +9,7 @@ const TONES: Record<string, { dot: string; pill: string }> = {
   },
   gray: {
     dot: 'bg-gray-400',
-    pill: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+    pill: 'bg-muted text-muted-foreground',
   },
   red: {
     dot: 'bg-red-500',
@@ -24,15 +26,16 @@ export function StateBadge({ state, size = 'sm' }: { state: string; size?: 'sm' 
   const tone = TONES[stateTone(state)]
   const pulse = ['pending', 'stopping', 'shutting-down', 'rebooting'].includes(state)
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full font-medium ${tone.pill} ${
-        size === 'md' ? 'px-2.5 py-1 text-xs' : 'px-2 py-0.5 text-[11px]'
-      }`}
+    <Badge
+      variant="secondary"
+      className={cn(
+        'gap-1.5 border-transparent',
+        tone.pill,
+        size === 'md' ? 'h-6 px-2.5 text-xs' : 'h-5 px-2 text-[11px]',
+      )}
     >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${tone.dot} ${pulse ? 'animate-pulse' : ''}`}
-      />
+      <span className={cn('h-1.5 w-1.5 rounded-full', tone.dot, pulse && 'animate-pulse')} />
       {stateLabel(state)}
-    </span>
+    </Badge>
   )
 }

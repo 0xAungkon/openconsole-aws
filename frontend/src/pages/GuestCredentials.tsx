@@ -1,10 +1,12 @@
+import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { CredentialForm } from '../components/CredentialForm'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { testConnection } from '../api/proxy'
+import { CredentialForm, type CredentialValues } from '../components/CredentialForm'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
-import { useMutation } from '@tanstack/react-query'
-import type { CredentialValues } from '../components/CredentialForm'
 
 /**
  * Guest connect gate: entering credentials validates the connection, then stores
@@ -36,22 +38,22 @@ export function GuestCredentials() {
       })
       setRegion(v.default_region)
       setEndpointUrl(v.endpoint_url.trim())
+      toast.success(`Connected to ${v.endpoint_url.trim() || 'AWS'} in ${v.default_region}`)
       navigate('/guest', { replace: true })
     },
   })
 
   return (
     <div className="flex min-h-full items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
-          Guest credentials
-        </h1>
-        <p className="mt-1 text-xs text-gray-500">
-          Stored only in this browser (localStorage) and sent with each request.
-          Never persisted on the server.
-        </p>
-
-        <div className="mt-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Guest credentials</CardTitle>
+          <CardDescription>
+            Stored only in this browser (localStorage) and sent with each request. Never
+            persisted on the server.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
           <CredentialForm
             submitLabel="Connect"
             pendingLabel="Testing connection…"
@@ -59,19 +61,18 @@ export function GuestCredentials() {
             error={connect.isError ? connect.error : undefined}
             onSubmit={(v) => connect.mutate(v)}
           />
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            useAuthStore.getState().reset()
-            navigate('/')
-          }}
-          className="mt-3 w-full text-center text-sm text-gray-500 hover:text-gray-700"
-        >
-          ← Back
-        </button>
-      </div>
+          <Button
+            variant="link"
+            onClick={() => {
+              useAuthStore.getState().reset()
+              navigate('/')
+            }}
+            className="w-full text-muted-foreground"
+          >
+            ← Back
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

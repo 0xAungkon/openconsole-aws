@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { toast } from 'sonner'
 import { useAuthStore } from '../store/authStore'
 
 // Backend base URL comes from the environment (VITE_API_URL). Requests are made
@@ -31,6 +32,7 @@ api.interceptors.response.use(
       const { mode, token, reset } = useAuthStore.getState()
       if (mode === 'register' && token) {
         reset()
+        toast.error('Your session has expired — please sign in again.', { id: 'session-expired' })
         if (window.location.pathname !== '/') window.location.assign('/')
       }
     }

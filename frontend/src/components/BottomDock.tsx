@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { ScrollText, TerminalSquare, X } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { cn } from 'cn'
+import { Button } from '@/components/ui/button'
 import { listProfiles } from '../api/auth'
 import { slugify } from '../lib/slug'
 import { useAuthStore } from '../store/authStore'
@@ -57,36 +59,35 @@ export function BottomDock() {
 
   const toggle = (p: Panel) => setPanel((cur) => (cur === p ? null : p))
 
-  const btn = (active: boolean) =>
-    `flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition ${
+  const tab = (active: boolean) =>
+    cn(
+      'flex h-full items-center gap-1.5 rounded-none px-2.5 text-xs font-medium',
       active
-        ? 'bg-brand-500 text-white'
-        : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
-    }`
+        ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
+        : 'text-muted-foreground',
+    )
 
   return (
     <div className="shrink-0">
       {panel && (
-        <div
-          style={{ height }}
-          className="relative border-t border-gray-200 dark:border-gray-800"
-        >
+        <div style={{ height }} className="relative border-t">
           {/* resize handle */}
           <div
             onPointerDown={startDrag}
             className="absolute inset-x-0 -top-1 z-10 h-2 cursor-row-resize"
             title="Drag to resize"
           />
-          <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+          <div className="flex items-center justify-between border-b bg-muted/60 px-3 py-1 text-xs font-medium">
             <span>{panel === 'cli' ? 'CLI' : 'Inspector'}</span>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={() => setPanel(null)}
-              className="rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-800"
               aria-label="Close panel"
+              className="text-muted-foreground"
             >
-              <X className="h-4 w-4" />
-            </button>
+              <X />
+            </Button>
           </div>
           <div className="h-[calc(100%-1.75rem)]">
             {panel === 'cli' ? <CliPanel /> : <InspectorPanel />}
@@ -95,38 +96,36 @@ export function BottomDock() {
       )}
 
       {/* bar */}
-      <div className="flex h-8 items-center justify-between border-t border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+      <div className="flex h-8 items-center justify-between border-t bg-card">
         <div className="flex h-full items-stretch">
-          <button type="button" onClick={() => toggle('cli')} className={btn(panel === 'cli')}>
-            <TerminalSquare className="h-3.5 w-3.5" />
+          <Button variant="ghost" onClick={() => toggle('cli')} className={tab(panel === 'cli')} aria-pressed={panel === 'cli'}>
+            <TerminalSquare className="size-3.5" />
             CLI
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => toggle('inspector')}
-            className={btn(panel === 'inspector')}
+            className={tab(panel === 'inspector')}
+            aria-pressed={panel === 'inspector'}
           >
-            <ScrollText className="h-3.5 w-3.5" />
+            <ScrollText className="size-3.5" />
             Inspector
-          </button>
+          </Button>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setEndpointOpen(true)}
-          className="flex items-center gap-1.5 px-3 text-xs text-gray-500 hover:text-brand-600"
+          className="h-full rounded-none px-3 text-xs font-normal text-muted-foreground hover:text-primary"
           title="Configure endpoint"
         >
-          <span
-            className={`h-2 w-2 rounded-full ${
-              effectiveEndpoint ? 'bg-amber-500' : 'bg-green-500'
-            }`}
-          />
+          <span className={cn('h-2 w-2 rounded-full', effectiveEndpoint ? 'bg-amber-500' : 'bg-green-500')} />
           {effectiveEndpoint || 'AWS default endpoint'}
-        </button>
+        </Button>
       </div>
 
-      {endpointOpen && <EndpointDialog onClose={() => setEndpointOpen(false)} />}
+      {endpointOpen && <EndpointDialog open={endpointOpen} onClose={() => setEndpointOpen(false)} />}
     </div>
   )
 }

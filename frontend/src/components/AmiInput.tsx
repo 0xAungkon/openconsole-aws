@@ -1,9 +1,13 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Check, X } from 'lucide-react'
+import { cn } from 'cn'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { runQuery } from '../api/proxy'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
+import { ComboListbox, ComboOption } from './ComboListbox'
 
 interface Ami {
   ImageId: string
@@ -74,6 +78,7 @@ export function AmiInput({ id, value, required, onChange }: {
     enabled: ready && open && search === value.trim(),
     staleTime: 5 * 60 * 1000,
     retry: false,
+    meta: { silent: true },
   })
   const options = search === value.trim()
     ? [...new Map((images.data?.pages.flatMap((p) => p.Images ?? []) ?? [])
@@ -100,91 +105,90 @@ export function AmiInput({ id, value, required, onChange }: {
   }, [active, id])
 
   return (
-    <div className="relative" onBlur={(e) => {
+    <div onBlur={(e) => {
       if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false)
     }}>
       {selectedImage && (
-        <div id={`${id}-selection`} className="mb-2 rounded-md border border-brand-200 bg-brand-50 px-3 py-2.5 dark:border-brand-800 dark:bg-brand-900/20">
-          <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-brand-700 dark:text-brand-200">
-            <Check aria-hidden="true" className="h-3.5 w-3.5" /> Selected image
+        <div id={`${id}-selection`} className="mb-2 rounded-md border border-primary/30 bg-accent px-3 py-2.5">
+          <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-accent-foreground">
+            <Check aria-hidden="true" className="size-3.5" /> Selected image
           </div>
-          <div className="break-words text-sm font-semibold text-gray-900 dark:text-gray-100">{imageName(selectedImage)}</div>
-          <div className="mt-1 break-all font-mono text-xs text-gray-600 dark:text-gray-300">{selectedImage.ImageId}</div>
-          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{architectureLabel(selectedImage.Architecture)}</div>
-          {selectedImage.Description && <p className="mt-2 break-words text-xs text-gray-600 dark:text-gray-300">{selectedImage.Description}</p>}
+          <div className="break-words text-sm font-semibold">{imageName(selectedImage)}</div>
+          <div className="mt-1 break-all font-mono text-xs text-muted-foreground">{selectedImage.ImageId}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{architectureLabel(selectedImage.Architecture)}</div>
+          {selectedImage.Description && <p className="mt-2 break-words text-xs text-muted-foreground">{selectedImage.Description}</p>}
         </div>
       )}
-      <div className="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1.5 focus-within:border-brand-500 dark:border-gray-700 dark:bg-gray-950">
-        <input
-          ref={input}
-          id={id}
-          role="combobox"
-          aria-expanded={open}
-          aria-controls={`${id}-options`}
-          aria-autocomplete="list"
-          aria-activedescendant={open && active >= 0 && active < optionCount ? `${id}-option-${active}` : undefined}
-          aria-describedby={[selectedImage ? `${id}-selection` : '', open ? `${id}-status` : ''].filter(Boolean).join(' ') || undefined}
-          required={required}
-          value={value}
-          autoComplete="off"
-          placeholder="Search by image name or paste an ID"
-          onFocus={() => setOpen(true)}
-          onClick={() => setOpen(true)}
-          onChange={(e) => { onChange(e.target.value); setSelection(null); setActive(-1); setOpen(true) }}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-              e.preventDefault()
+      <ComboListbox
+        open={open}
+        listId={`${id}-options`}
+        label="AMI images"
+        anchor={
+          <div className="relative">
+            <Input
+              ref={input}
+              id={id}
+              role="combobox"
+              aria-expanded={open}
+              aria-controls={`${id}-options`}
+              aria-autocomplete="list"
+              aria-activedescendant={open && active >= 0 && active < optionCount ? `${id}-option-${active}` : undefined}
+              aria-describedby={[selectedImage ? `${id}-selection` : '', open ? `${id}-status` : ''].filter(Boolean).join(' ') || undefined}
+              required={required}
+              value={value}
+              autoComplete="off"
+              placeholder="Search by image name or paste an ID"
+              onFocus={() => setOpen(true)}
+              onClick={() => setOpen(true)}
+              onChange={(e) => { onChange(e.target.value); setSelection(null); setActive(-1); setOpen(true) }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  setOpen(true)
+                  setActive((i) => Math.max(0, Math.min(optionCount - 1, i + (e.key === 'ArrowDown' ? 1 : -1))))
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  setOpen(false)
+                } else if (e.key === 'Enter' && open) {
+                  e.preventDefault()
+                  choose(options[active]?.ImageId ?? custom)
+                }
+              }}
+              className={cn('pr-8', value && !open && 'bg-accent font-mono text-accent-foreground')}
+            />
+            {value && <Button type="button" variant="ghost" size="icon-xs" aria-label="Clear image ID" className="absolute inset-y-0 right-1 my-auto text-muted-foreground" onClick={() => {
+              onChange('')
+              setSelection(null)
+              setActive(-1)
               setOpen(true)
-              setActive((i) => Math.max(0, Math.min(optionCount - 1, i + (e.key === 'ArrowDown' ? 1 : -1))))
-            } else if (e.key === 'Escape') {
-              e.preventDefault()
-              setOpen(false)
-            } else if (e.key === 'Enter' && open) {
-              e.preventDefault()
-              choose(options[active]?.ImageId ?? custom)
-            }
-          }}
-          className={`min-w-0 flex-1 rounded px-1 py-0.5 text-sm outline-none ${value && !open ? 'bg-brand-50 font-mono text-brand-700 dark:bg-brand-900/40 dark:text-brand-200' : 'bg-transparent'}`}
-        />
-        {value && <button type="button" aria-label="Clear image ID" onClick={() => {
-          onChange('')
-          setSelection(null)
-          setActive(-1)
-          setOpen(true)
-          input.current?.focus()
-        }} className="rounded p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"><X className="h-3.5 w-3.5" /></button>}
-      </div>
-      {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
-          <div id={`${id}-options`} role="listbox" aria-label="AMI images" className="max-h-64 overflow-y-auto">
-            {options.map((ami, index) => (
-              <div key={ami.ImageId} id={`${id}-option-${index}`} role="option" aria-selected={active === index}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => choose(ami.ImageId)}
-                className={`cursor-pointer px-3 py-2 text-xs hover:bg-brand-50 dark:hover:bg-gray-800 ${active === index ? 'bg-brand-50 dark:bg-gray-800' : ''}`}>
-                <div className="break-words text-sm font-medium text-gray-900 dark:text-gray-100">{imageName(ami)}</div>
-                <div className="mt-1 break-all font-mono text-gray-500 dark:text-gray-400">{ami.ImageId}</div>
-                <div className="mt-1 text-gray-500 dark:text-gray-400">{architectureLabel(ami.Architecture)}</div>
-                {ami.Description && <div className="mt-1 line-clamp-2 break-words text-gray-500 dark:text-gray-400">{ami.Description}</div>}
-              </div>
-            ))}
-            {custom && <div id={`${id}-option-${options.length}`} role="option" aria-selected={active === options.length}
-              onMouseDown={(e) => e.preventDefault()} onClick={() => choose(custom)}
-              className={`cursor-pointer break-all border-t border-gray-100 px-3 py-2 text-xs text-brand-600 hover:bg-brand-50 dark:border-gray-800 dark:hover:bg-gray-800 ${active === options.length ? 'bg-brand-50 dark:bg-gray-800' : ''}`}>
-              Use “{custom}” as a custom image ID
-            </div>}
+              input.current?.focus()
+            }}><X /></Button>}
           </div>
-          <div id={`${id}-status`} role="status" className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800">
+        }
+        footer={
+          <div id={`${id}-status`} role="status" className="border-t px-3 py-2 text-xs text-muted-foreground">
             {!ready ? 'Configure credentials or select a profile to browse images.'
               : images.isError ? `Could not load images: ${images.error.message}. You can still enter a custom ID.`
               : images.isFetching || search !== custom ? 'Loading images…'
               : options.length === 0 ? 'No matching images. You can enter a custom ID.'
               : `Amazon and your images in ${region}. Search by name or ID.`}
-            {images.isError && <button type="button" onClick={() => void images.refetch()} className="ml-2 text-brand-600">Retry</button>}
-            {images.hasNextPage && <button type="button" disabled={images.isFetching} onClick={() => void images.fetchNextPage()} className="mt-2 block text-brand-600 disabled:opacity-50">Load more images</button>}
+            {images.isError && <Button type="button" variant="link" size="xs" onClick={() => void images.refetch()}>Retry</Button>}
+            {images.hasNextPage && <Button type="button" variant="link" size="xs" className="mt-1 block px-0" disabled={images.isFetching} onClick={() => void images.fetchNextPage()}>Load more images</Button>}
           </div>
-        </div>
-      )}
+        }
+      >
+        {options.map((ami, index) => (
+          <ComboOption key={ami.ImageId} id={`${id}-option-${index}`} active={active === index} onSelect={() => choose(ami.ImageId)} className="text-xs">
+            <div className="break-words text-sm font-medium">{imageName(ami)}</div>
+            <div className="mt-1 break-all font-mono text-muted-foreground">{ami.ImageId}</div>
+            <div className="mt-1 text-muted-foreground">{architectureLabel(ami.Architecture)}</div>
+            {ami.Description && <div className="mt-1 line-clamp-2 break-words text-muted-foreground">{ami.Description}</div>}
+          </ComboOption>
+        ))}
+        {custom && <ComboOption id={`${id}-option-${options.length}`} active={active === options.length} onSelect={() => choose(custom)} className="break-all border-t text-xs text-primary">
+          Use “{custom}” as a custom image ID
+        </ComboOption>}
+      </ComboListbox>
     </div>
   )
 }

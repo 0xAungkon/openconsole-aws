@@ -1,9 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { Check, ChevronDown, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { runQuery } from '../api/proxy'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
+import { ComboListbox, ComboOption } from './ComboListbox'
 
 interface InstanceType {
   InstanceType: string
@@ -71,6 +74,7 @@ export function InstanceTypeInput({ id, value, required, onChange }: {
     enabled: ready,
     staleTime: 5 * 60 * 1000,
     retry: false,
+    meta: { silent: true },
   })
   const selected = types.data?.find((type) => type.InstanceType === value.trim())
   const term = search.trim().toLowerCase()
@@ -92,58 +96,62 @@ export function InstanceTypeInput({ id, value, required, onChange }: {
   }, [active, id])
 
   return (
-    <div className="relative" onBlur={(e) => {
+    <div onBlur={(e) => {
       if (!e.currentTarget.contains(e.relatedTarget)) { setOpen(false); setSearch(''); setActive(-1) }
     }}>
-      {selected && <div id={`${id}-selection`} className="mb-2 rounded-md border border-brand-200 bg-brand-50 px-3 py-2.5 dark:border-brand-800 dark:bg-brand-900/20">
-        <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-brand-700 dark:text-brand-200"><Check aria-hidden="true" className="h-3.5 w-3.5" /> Selected server size</div>
+      {selected && <div id={`${id}-selection`} className="mb-2 rounded-md border border-primary/30 bg-accent px-3 py-2.5">
+        <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-accent-foreground"><Check aria-hidden="true" className="size-3.5" /> Selected server size</div>
         <div className="text-sm font-semibold">{selected.InstanceType}</div>
-        <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">{details(selected)}</div>
-        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{architecture(selected)}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{details(selected)}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{architecture(selected)}</div>
       </div>}
-      <div className="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1.5 focus-within:border-brand-500 dark:border-gray-700 dark:bg-gray-950">
-        <input ref={input} id={id} role="combobox" aria-expanded={open} aria-controls={`${id}-options`} aria-autocomplete="list"
-          aria-activedescendant={open && active >= 0 && active < count ? `${id}-option-${active}` : undefined}
-          aria-describedby={`${id}-status${selected ? ` ${id}-selection` : ''}`}
-          required={required} value={value} autoComplete="off" placeholder="Choose a server size or enter a type"
-          onFocus={() => { setSearch(''); setOpen(true) }} onClick={() => setOpen(true)}
-          onChange={(e) => { onChange(e.target.value); setSearch(e.target.value); setActive(-1); setOpen(true) }}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-              e.preventDefault(); setOpen(true)
-              setActive((i) => Math.max(0, Math.min(count - 1, i + (e.key === 'ArrowDown' ? 1 : -1))))
-            } else if (e.key === 'Escape') {
-              e.preventDefault(); setOpen(false); setActive(-1)
-            } else if (e.key === 'Enter' && open) {
-              e.preventDefault(); choose(options[active]?.InstanceType ?? value.trim())
-            }
-          }} className="min-w-0 flex-1 bg-transparent px-1 py-0.5 text-sm outline-none" />
-        {value && <button type="button" aria-label="Clear server size" onClick={() => {
-          onChange(''); setSearch(''); setActive(-1); input.current?.focus()
-        }} className="rounded p-1 text-gray-400"><X className="h-3.5 w-3.5" /></button>}
-        <button type="button" aria-label="Browse server sizes" onClick={() => { input.current?.focus(); setSearch(''); setOpen(true) }} className="rounded p-1 text-gray-400"><ChevronDown className="h-4 w-4" /></button>
-      </div>
-      {open && <div className="absolute z-30 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
-        <div id={`${id}-options`} role="listbox" aria-label="Server sizes" className="max-h-64 overflow-y-auto">
-          {options.map((type, index) => <div key={type.InstanceType} id={`${id}-option-${index}`} role="option" aria-selected={active === index}
-            onMouseDown={(e) => e.preventDefault()} onClick={() => choose(type.InstanceType)}
-            className={`cursor-pointer px-3 py-2 hover:bg-brand-50 dark:hover:bg-gray-800 ${active === index ? 'bg-brand-50 dark:bg-gray-800' : ''}`}>
-            <div className="text-sm font-medium">{type.InstanceType}</div>
-            <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">{details(type)}</div>
-            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{architecture(type)}</div>
-          </div>)}
-          {showCustom && <div id={`${id}-option-${options.length}`} role="option" aria-selected={active === options.length}
-            onMouseDown={(e) => e.preventDefault()} onClick={() => choose(custom)}
-            className={`cursor-pointer break-all px-3 py-2 text-xs text-brand-600 hover:bg-brand-50 dark:hover:bg-gray-800 ${active === options.length ? 'bg-brand-50 dark:bg-gray-800' : ''}`}>Use “{custom}” as a custom instance type</div>}
-        </div>
-      </div>}
-      <div id={`${id}-status`} role="status" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+      <ComboListbox
+        open={open}
+        listId={`${id}-options`}
+        label="Server sizes"
+        anchor={
+          <div className="relative">
+            <Input ref={input} id={id} role="combobox" aria-expanded={open} aria-controls={`${id}-options`} aria-autocomplete="list"
+              aria-activedescendant={open && active >= 0 && active < count ? `${id}-option-${active}` : undefined}
+              aria-describedby={`${id}-status${selected ? ` ${id}-selection` : ''}`}
+              required={required} value={value} autoComplete="off" placeholder="Choose a server size or enter a type"
+              onFocus={() => { setSearch(''); setOpen(true) }} onClick={() => setOpen(true)}
+              onChange={(e) => { onChange(e.target.value); setSearch(e.target.value); setActive(-1); setOpen(true) }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault(); setOpen(true)
+                  setActive((i) => Math.max(0, Math.min(count - 1, i + (e.key === 'ArrowDown' ? 1 : -1))))
+                } else if (e.key === 'Escape') {
+                  e.preventDefault(); setOpen(false); setActive(-1)
+                } else if (e.key === 'Enter' && open) {
+                  e.preventDefault(); choose(options[active]?.InstanceType ?? value.trim())
+                }
+              }} className="pr-16" />
+            <div className="absolute inset-y-0 right-1 flex items-center">
+              {value && <Button type="button" variant="ghost" size="icon-xs" aria-label="Clear server size" className="text-muted-foreground" onClick={() => {
+                onChange(''); setSearch(''); setActive(-1); input.current?.focus()
+              }}><X /></Button>}
+              <Button type="button" variant="ghost" size="icon-xs" aria-label="Browse server sizes" className="text-muted-foreground" onClick={() => { input.current?.focus(); setSearch(''); setOpen(true) }}><ChevronDown /></Button>
+            </div>
+          </div>
+        }
+      >
+        {options.map((type, index) => <ComboOption key={type.InstanceType} id={`${id}-option-${index}`} active={active === index} onSelect={() => choose(type.InstanceType)}>
+          <div className="text-sm font-medium">{type.InstanceType}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{details(type)}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{architecture(type)}</div>
+        </ComboOption>)}
+        {showCustom && <ComboOption id={`${id}-option-${options.length}`} active={active === options.length} onSelect={() => choose(custom)} className="break-all text-xs text-primary">
+          Use “{custom}” as a custom instance type
+        </ComboOption>}
+      </ComboListbox>
+      <div id={`${id}-status`} role="status" className="mt-1 text-xs text-muted-foreground">
         {!ready ? 'Configure credentials or select a profile to browse server sizes.'
           : types.isError ? `Could not load server sizes: ${types.error.message} You can still enter a type manually.`
           : types.isPending ? 'Loading server sizes…'
           : open && options.length === 0 ? 'No matching server sizes. Try another search or enter a custom type.'
           : `Server sizes in ${region}. Memory is shown in GiB and MiB.`}
-        {types.isError && <button type="button" onClick={() => void types.refetch()} className="ml-2 text-brand-600">Retry</button>}
+        {types.isError && <Button type="button" variant="link" size="xs" onClick={() => void types.refetch()}>Retry</Button>}
       </div>
     </div>
   )

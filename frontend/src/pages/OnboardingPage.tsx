@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { listProfiles } from '../api/auth'
 import { ProfileForm } from '../components/ProfileForm'
 import { slugify } from '../lib/slug'
@@ -24,7 +26,7 @@ export function OnboardingPage() {
 
   if (profiles.isLoading) {
     return (
-      <div className="flex min-h-full items-center justify-center text-sm text-gray-400">
+      <div className="flex min-h-full items-center justify-center text-sm text-muted-foreground">
         Loading…
       </div>
     )
@@ -37,35 +39,31 @@ export function OnboardingPage() {
 
   return (
     <div className="flex min-h-full items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
-          Add your first AWS profile
-        </h1>
-        <p className="mt-1 text-xs text-gray-500">
-          To start issuing queries, provide AWS credentials. They are encrypted
-          at rest and reused across sessions.
-        </p>
-
-        <div className="mt-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Add your first AWS profile</CardTitle>
+          <CardDescription>
+            To start issuing queries, provide AWS credentials. They are encrypted at rest
+            and reused across sessions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
           <ProfileForm
             submitLabel="Create profile"
-            onSuccess={(created) =>
-              navigate(`/${slugify(created.label)}`, { replace: true })
-            }
+            onSuccess={(created) => navigate(`/${slugify(created.label)}`, { replace: true })}
           />
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            reset()
-            navigate('/')
-          }}
-          className="mt-3 w-full text-center text-sm text-gray-500 hover:text-gray-700"
-        >
-          ← Sign out
-        </button>
-      </div>
+          <Button
+            variant="link"
+            onClick={() => {
+              reset()
+              navigate('/')
+            }}
+            className="w-full text-muted-foreground"
+          >
+            ← Sign out
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

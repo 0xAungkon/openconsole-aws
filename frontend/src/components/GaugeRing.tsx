@@ -24,7 +24,7 @@ export function GaugeRing({ label, fraction, centerText, caption }: GaugeRingPro
           r={r}
           fill="none"
           strokeWidth={stroke}
-          className="stroke-gray-100 dark:stroke-gray-800"
+          className="stroke-border"
         />
         {clamped > 0 && (
           <circle
@@ -35,7 +35,7 @@ export function GaugeRing({ label, fraction, centerText, caption }: GaugeRingPro
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={`${dash} ${circ - dash}`}
-            className="stroke-brand-500 transition-[stroke-dasharray] duration-500"
+            className="stroke-primary transition-[stroke-dasharray] duration-500"
           />
         )}
         <text
@@ -43,17 +43,17 @@ export function GaugeRing({ label, fraction, centerText, caption }: GaugeRingPro
           y="50%"
           dominantBaseline="central"
           textAnchor="middle"
-          className="rotate-90 fill-gray-800 text-base font-semibold dark:fill-gray-100"
+          className="rotate-90 fill-foreground text-base font-semibold"
           style={{ transformOrigin: 'center' }}
         >
           {centerText}
         </text>
       </svg>
-      <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+      <span className="text-sm font-medium">
         {label}
       </span>
       {caption && (
-        <span className="text-xs text-gray-400">{caption}</span>
+        <span className="text-xs text-muted-foreground">{caption}</span>
       )}
     </div>
   )

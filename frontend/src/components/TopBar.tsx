@@ -1,7 +1,24 @@
 import { useQuery } from '@tanstack/react-query'
 import { Check, Plus, UserCircle2 } from 'lucide-react'
-import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { listProfiles } from '../api/auth'
 import { slugify } from '../lib/slug'
 import { useAuthStore } from '../store/authStore'
@@ -12,7 +29,6 @@ export function TopBar({ title }: { title: string }) {
   const { profile: profileParam } = useParams()
   const { mode, user } = useAuthStore()
   const { region, setRegion } = useSessionStore()
-  const [open, setOpen] = useState(false)
 
   const profilesQuery = useQuery({
     queryKey: ['profiles'],
@@ -22,108 +38,82 @@ export function TopBar({ title }: { title: string }) {
   const profiles = profilesQuery.data ?? []
 
   return (
-    <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2.5 dark:border-gray-800 dark:bg-gray-900">
-      <h1 className="text-sm font-medium text-gray-700 dark:text-gray-200">{title}</h1>
+    <header className="flex items-center justify-between border-b bg-card px-4 py-2">
+      <h1 className="text-sm font-medium">{title}</h1>
 
       <div className="flex items-center gap-3">
-        <select
-          value={region}
-          onChange={(e) => setRegion(e.target.value)}
-          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950"
-          title="Region"
-        >
-          {AWS_REGIONS.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+        <Select value={region} onValueChange={setRegion}>
+          <SelectTrigger size="sm" aria-label="Region" className="w-40 text-xs">
+            <SelectValue placeholder="Region" />
+          </SelectTrigger>
+          <SelectContent>
+            {AWS_REGIONS.map((r) => (
+              <SelectItem key={r} value={r} className="text-xs">
+                {r}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {mode === 'guest' && (
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+          <Badge className="border-transparent bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
             Guest Mode
-          </span>
+          </Badge>
         )}
 
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="flex items-center rounded-full text-gray-500 hover:text-brand-600"
-            title="Account"
-          >
-            <UserCircle2 className="h-7 w-7" />
-          </button>
-
-          {open && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-              <div className="absolute right-0 z-50 mt-2 w-64 rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-800 dark:bg-gray-900">
-                {mode === 'register' ? (
-                  <>
-                    <div className="px-3 py-2">
-                      <div className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                        {user?.name ?? 'Account'}
-                      </div>
-                      <div className="truncate text-xs text-gray-400">
-                        {user?.email}
-                      </div>
-                    </div>
-                    <div className="border-t border-gray-100 px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800">
-                      Profiles
-                    </div>
-                    <div className="max-h-56 overflow-y-auto">
-                      {profiles.map((p) => {
-                        const active = slugify(p.label) === profileParam
-                        return (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => {
-                              setOpen(false)
-                              navigate(`/${slugify(p.label)}`)
-                            }}
-                            className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
-                          >
-                            <span className="truncate">
-                              {p.label}
-                              <span className="ml-1 text-xs text-gray-400">
-                                {p.default_region}
-                              </span>
-                            </span>
-                            {active && (
-                              <Check className="h-4 w-4 shrink-0 text-brand-500" />
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOpen(false)
-                        navigate('/onboarding')
-                      }}
-                      className="mt-1 flex w-full items-center gap-2 rounded-md border-t border-gray-100 px-3 py-2 text-left text-sm text-brand-600 hover:bg-brand-50 dark:border-gray-800 dark:text-brand-300 dark:hover:bg-gray-800"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add profile
-                    </button>
-                  </>
-                ) : (
-                  <div className="px-3 py-2">
-                    <div className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                      Guest session
-                    </div>
-                    <div className="mt-0.5 text-xs text-gray-400">
-                      Credentials are stored only in this browser.
-                    </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Account" className="rounded-full text-muted-foreground hover:text-primary">
+              <UserCircle2 className="size-7" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            {mode === 'register' ? (
+              <>
+                <DropdownMenuLabel className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium">{user?.name ?? 'Account'}</span>
+                  <span className="truncate text-xs font-normal text-muted-foreground">{user?.email}</span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Profiles
+                  </DropdownMenuLabel>
+                  <div className="max-h-56 overflow-y-auto">
+                    {profiles.map((p) => {
+                      const active = slugify(p.label) === profileParam
+                      return (
+                        <DropdownMenuItem
+                          key={p.id}
+                          onSelect={() => navigate(`/${slugify(p.label)}`)}
+                          className="justify-between"
+                        >
+                          <span className="truncate">
+                            {p.label}
+                            <span className="ml-1 text-xs text-muted-foreground">{p.default_region}</span>
+                          </span>
+                          {active && <Check className="shrink-0 text-primary" />}
+                        </DropdownMenuItem>
+                      )
+                    })}
                   </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => navigate('/onboarding')} className="text-primary focus:text-primary">
+                  <Plus />
+                  Add profile
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <DropdownMenuLabel className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium">Guest session</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  Credentials are stored only in this browser.
+                </span>
+              </DropdownMenuLabel>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   )

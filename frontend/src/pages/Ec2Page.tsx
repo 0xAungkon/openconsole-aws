@@ -13,9 +13,32 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+import { cn } from 'cn'
+import { Button } from '@/components/ui/button'
+import { Card as UiCard, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { runQuery } from '../api/proxy'
 import { ActionForm } from '../components/ActionForm'
 import { Card } from '../components/Card'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { StateBadge } from '../components/StateBadge'
 import { flattenInstances, timeAgo, type InstanceRow } from '../lib/ec2'
@@ -36,6 +59,12 @@ function matchesStatus(state: string, filter: StatusFilter): boolean {
   return state !== 'running' && state !== 'stopped'
 }
 
+const OP_LABEL: Record<string, string> = {
+  start_instances: 'Start requested for',
+  stop_instances: 'Stop requested for',
+  terminate_instances: 'Termination requested for',
+}
+
 export function Ec2Page() {
   const { profile } = useParams()
   const navigate = useNavigate()
@@ -47,6 +76,7 @@ export function Ec2Page() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [launchOpen, setLaunchOpen] = useState(false)
+  const [terminateId, setTerminateId] = useState<string | null>(null)
 
   const needsProfile = mode === 'register' && activeProfileId == null
 
@@ -107,15 +137,20 @@ export function Ec2Page() {
   const lifecycle = useMutation({
     mutationFn: ({ op, id }: { op: string; id: string }) =>
       runQuery('ec2', op, { InstanceIds: [id] }),
-    onSuccess: invalidate,
+    onSuccess: (_result, { op, id }) => {
+      invalidate()
+      toast.success(`${OP_LABEL[op] ?? 'Action applied to'} ${id}`)
+    },
   })
 
   const launch = useMutation({
     mutationFn: (params: Record<string, unknown>) =>
-      runQuery('ec2', 'run_instances', params),
-    onSuccess: () => {
+      runQuery<{ Instances?: { InstanceId?: string }[] }>('ec2', 'run_instances', params),
+    onSuccess: (result) => {
       invalidate()
       setLaunchOpen(false)
+      const ids = (result?.Instances ?? []).map((i) => i.InstanceId).filter(Boolean)
+      toast.success(ids.length ? `Launched ${ids.join(', ')}` : 'Server launch requested')
     },
   })
 
@@ -123,8 +158,8 @@ export function Ec2Page() {
 
   function act(op: string, id: string) {
     if (op === 'terminate_instances') {
-      if (!window.confirm(`Terminate ${id}? This permanently deletes the server.`))
-        return
+      setTerminateId(id)
+      return
     }
     lifecycle.mutate({ op, id })
   }
@@ -139,62 +174,61 @@ export function Ec2Page() {
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-5 border-b border-gray-200 pb-5 dark:border-gray-800">
+      <div className="flex flex-wrap items-center gap-5 border-b pb-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300"><Cpu aria-hidden="true" className="h-5 w-5" /></div>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+            <Cpu aria-hidden="true" className="h-5 w-5" />
+          </div>
           <div>
-          <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-            Your servers
-          </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Virtual machines running in {region}
-          </p>
+            <h1 className="text-xl font-semibold tracking-tight">Your servers</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Virtual machines running in {region}
+            </p>
           </div>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 xl:ml-auto xl:w-auto">
           <div className="relative min-w-0 flex-1 sm:flex-none">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or ID"
               aria-label="Search servers by name or ID"
-              className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-8 pr-3 text-sm transition placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 sm:w-64 dark:border-gray-700 dark:bg-gray-900 dark:focus:ring-brand-900/40"
+              className="pl-8 sm:w-64"
             />
           </div>
           {!needsProfile && (
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as StatusFilter)}
-              className="rounded-lg border border-gray-200 bg-white py-2.5 pl-3 pr-8 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-900 dark:focus:ring-brand-900/40"
-              title="Filter by status"
-            >
-              {FILTERS.map((f) => (
-                <option key={f.key} value={f.key}>
-                  {f.label} ({counts[f.key]})
-                </option>
-              ))}
-            </select>
+            <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
+              <SelectTrigger aria-label="Filter by status" className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTERS.map((f) => (
+                  <SelectItem key={f.key} value={f.key}>
+                    {f.label} ({counts[f.key]})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
-          <button
-            type="button"
-            onClick={() => invalidate()}
-            disabled={instancesQuery.isFetching}
-            className="rounded-md border border-gray-300 p-2 text-gray-500 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
-            title="Refresh"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${instancesQuery.isFetching ? 'animate-spin' : ''}`}
-            />
-          </button>
-          <button
-            type="button"
-            onClick={() => setLaunchOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-brand-500 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-600"
-          >
-            <Plus className="h-4 w-4" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => invalidate()}
+                disabled={instancesQuery.isFetching}
+                aria-label="Refresh"
+              >
+                <RefreshCw className={cn(instancesQuery.isFetching && 'animate-spin')} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Refresh</TooltipContent>
+          </Tooltip>
+          <Button onClick={() => setLaunchOpen(true)}>
+            <Plus />
             New server
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -202,100 +236,104 @@ export function Ec2Page() {
 
       {/* Split pane: table on the left, launch form docked on the right */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <div className={`min-w-0 flex-1 ${launchOpen ? 'lg:w-[70%]' : ''}`}>
-          {/* Body */}
+        <div className={cn('min-w-0 flex-1', launchOpen && 'lg:w-[70%]')}>
           {needsProfile ? (
-        <Card title="Compute">
-          <p className="text-sm text-amber-600">
-            Select an AWS profile from the account menu to view your servers.
-          </p>
-        </Card>
-      ) : instancesQuery.isError ? (
-        <ErrorAlert error={instancesQuery.error} />
-      ) : instancesQuery.isLoading ? (
-        <p className="py-16 text-center text-sm text-gray-400">Loading your servers…</p>
-      ) : filtered.length === 0 ? (
-        <EmptyState hasAny={rows.length > 0} onLaunch={() => setLaunchOpen(true)} />
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800">
-                  <th className="px-4 py-2.5 font-medium">Name</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 font-medium">Size</th>
-                  <th className="px-4 py-2.5 font-medium">Zone</th>
-                  <th className="px-4 py-2.5 font-medium">Public IP</th>
-                  <th className="px-4 py-2.5 font-medium">Launched</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paged.map((r) => (
-                  <InstanceRowView
-                    key={r.InstanceId}
-                    row={r}
-                    busy={pendingId === r.InstanceId}
-                    onOpen={() => navigate(`/${profile}/compute/${r.InstanceId}`)}
-                    onAct={act}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex items-center justify-between gap-2 border-t border-gray-100 px-4 py-2.5 text-xs text-gray-500 dark:border-gray-800">
-            <span>
-              Showing {(page - 1) * PAGE_SIZE + 1}–
-              {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
-            </span>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="rounded-md border border-gray-300 px-2 py-1 font-medium transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:hover:bg-gray-800"
-                >
-                  Previous
-                </button>
-                <span className="px-2">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  className="rounded-md border border-gray-300 px-2 py-1 font-medium transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:hover:bg-gray-800"
-                >
-                  Next
-                </button>
+            <Card title="Compute">
+              <p className="text-sm text-warning">
+                Select an AWS profile from the account menu to view your servers.
+              </p>
+            </Card>
+          ) : instancesQuery.isError ? (
+            <ErrorAlert error={instancesQuery.error} />
+          ) : instancesQuery.isLoading ? (
+            <div className="flex flex-col gap-2 py-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <EmptyState hasAny={rows.length > 0} onLaunch={() => setLaunchOpen(true)} />
+          ) : (
+            <UiCard className="gap-0 py-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="px-4 text-xs uppercase tracking-wide">Name</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wide">Status</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wide">Size</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wide">Zone</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wide">Public IP</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wide">Launched</TableHead>
+                      <TableHead className="px-4 text-right text-xs uppercase tracking-wide">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paged.map((r) => (
+                      <InstanceRowView
+                        key={r.InstanceId}
+                        row={r}
+                        busy={pendingId === r.InstanceId}
+                        onOpen={() => navigate(`/${profile}/compute/${r.InstanceId}`)}
+                        onAct={act}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-            )}
-          </div>
-        </div>
-      )}
+              <div className="flex items-center justify-between gap-2 border-t px-4 py-2.5 text-xs text-muted-foreground">
+                <span>
+                  Showing {(page - 1) * PAGE_SIZE + 1}–
+                  {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+                </span>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="px-2">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </UiCard>
+          )}
         </div>
 
-        {/* Launch panel — docked to the right, ~40% width */}
+        {/* Launch panel — docked to the right, ~30% width */}
         {launchOpen && (
           <aside className="w-full shrink-0 lg:sticky lg:top-0 lg:w-[30%]">
-            <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-              <header className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-                <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
-                  <span className="inline-block h-4 w-[3px] rounded-full bg-brand-500" />
+            <UiCard className="gap-0 py-0">
+              <CardHeader className="flex flex-row items-center justify-between border-b px-4 py-3">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                  <span className="inline-block h-4 w-[3px] rounded-full bg-primary" />
                   Launch a new server
-                </h2>
-                <button
-                  type="button"
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => setLaunchOpen(false)}
-                  className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
                   aria-label="Close"
+                  className="text-muted-foreground"
                 >
-                  <X className="h-4 w-4" />
-                </button>
-              </header>
-              <div className="p-4">
+                  <X />
+                </Button>
+              </CardHeader>
+              <CardContent className="p-4">
                 {launch.isError && (
                   <div className="mb-3">
                     <ErrorAlert error={launch.error} />
@@ -306,42 +344,86 @@ export function Ec2Page() {
                   running={launch.isPending}
                   onRun={(params) => launch.mutate(params)}
                 />
-              </div>
-            </div>
+              </CardContent>
+            </UiCard>
           </aside>
         )}
       </div>
+
+      <ConfirmDialog
+        open={terminateId != null}
+        title={`Terminate ${terminateId}?`}
+        description="This permanently deletes the server and cannot be undone."
+        confirmLabel="Terminate"
+        pending={lifecycle.isPending}
+        onCancel={() => setTerminateId(null)}
+        onConfirm={() => {
+          if (!terminateId) return
+          lifecycle.mutate(
+            { op: 'terminate_instances', id: terminateId },
+            { onSettled: () => setTerminateId(null) },
+          )
+        }}
+      />
     </div>
   )
 }
 
 function EmptyState({ hasAny, onLaunch }: { hasAny: boolean; onLaunch: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-gray-300 py-16 text-center dark:border-gray-700">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-gray-800">
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-16 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-primary">
         <Cpu className="h-6 w-6" />
       </div>
       <div>
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+        <p className="text-sm font-medium">
           {hasAny ? 'No servers match your filters' : 'No servers yet'}
         </p>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted-foreground">
           {hasAny
             ? 'Try a different status or search term.'
             : 'Launch your first server to get started.'}
         </p>
       </div>
       {!hasAny && (
-        <button
-          type="button"
-          onClick={onLaunch}
-          className="inline-flex items-center gap-1.5 rounded-md bg-brand-500 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-brand-600"
-        >
-          <Plus className="h-4 w-4" />
+        <Button onClick={onLaunch}>
+          <Plus />
           New server
-        </button>
+        </Button>
       )}
     </div>
+  )
+}
+
+function RowAction({
+  label,
+  icon,
+  className,
+  disabled,
+  onClick,
+}: {
+  label: string
+  icon: React.ReactNode
+  className: string
+  disabled: boolean
+  onClick: (e: React.MouseEvent) => void
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onClick}
+          disabled={disabled}
+          aria-label={label}
+          className={className}
+        >
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -358,8 +440,6 @@ function InstanceRowView({
 }) {
   const [copied, setCopied] = useState(false)
   const stop = (e: React.MouseEvent) => e.stopPropagation()
-  const iconBtn =
-    'inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40'
 
   async function copyId(e: React.MouseEvent) {
     stop(e)
@@ -368,87 +448,68 @@ function InstanceRowView({
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      /* clipboard unavailable — ignore */
+      toast.error('Clipboard is unavailable in this browser')
     }
   }
 
   return (
-    <tr
-      onClick={onOpen}
-      className="cursor-pointer border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
-    >
-      <td className="px-4 py-2.5">
-        <div className="font-medium text-gray-800 dark:text-gray-100">
-          {row.Name || 'Unnamed server'}
-        </div>
+    <TableRow onClick={onOpen} className="cursor-pointer">
+      <TableCell className="px-4">
+        <div className="font-medium">{row.Name || 'Unnamed server'}</div>
         <div className="flex items-center gap-1">
-          <span className="font-mono text-xs text-gray-400">{row.InstanceId}</span>
-          <button
-            type="button"
+          <span className="font-mono text-xs text-muted-foreground">{row.InstanceId}</span>
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={copyId}
-            className="rounded p-0.5 text-gray-400 transition hover:bg-gray-100 hover:text-brand-600 dark:hover:bg-gray-800"
-            title="Copy instance ID"
             aria-label="Copy instance ID"
+            className="size-5 text-muted-foreground hover:text-primary"
           >
-            {copied ? (
-              <Check className="h-3 w-3 text-green-500" />
-            ) : (
-              <Copy className="h-3 w-3" />
-            )}
-          </button>
+            {copied ? <Check className="text-green-500" /> : <Copy />}
+          </Button>
         </div>
-      </td>
-      <td className="px-4 py-2.5">
+      </TableCell>
+      <TableCell>
         <StateBadge state={row.State} />
-      </td>
-      <td className="px-4 py-2.5 text-gray-600 dark:text-gray-300">{row.InstanceType}</td>
-      <td className="px-4 py-2.5 text-gray-600 dark:text-gray-300">{row.AZ}</td>
-      <td className="px-4 py-2.5 font-mono text-xs text-gray-600 dark:text-gray-400">
-        {row.PublicIpAddress || '—'}
-      </td>
-      <td className="px-4 py-2.5 text-gray-600 dark:text-gray-300">
-        {timeAgo(row.LaunchTime)}
-      </td>
-      <td className="px-4 py-2.5">
+      </TableCell>
+      <TableCell>{row.InstanceType}</TableCell>
+      <TableCell>{row.AZ}</TableCell>
+      <TableCell className="font-mono text-xs">{row.PublicIpAddress || '—'}</TableCell>
+      <TableCell>{timeAgo(row.LaunchTime)}</TableCell>
+      <TableCell className="px-4">
         <div className="flex items-center justify-end gap-1">
-          <button
-            type="button"
+          <RowAction
+            label="Start"
+            icon={<Play />}
+            className="text-green-600 hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-950/40"
+            disabled={busy || row.State !== 'stopped'}
             onClick={(e) => {
               stop(e)
               onAct('start_instances', row.InstanceId)
             }}
-            disabled={busy || row.State !== 'stopped'}
-            className={`${iconBtn} text-green-600 hover:bg-green-50 dark:hover:bg-green-950/40`}
-            title="Start"
-          >
-            <Play className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
+          />
+          <RowAction
+            label="Stop"
+            icon={<Square />}
+            className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/40"
+            disabled={busy || row.State !== 'running'}
             onClick={(e) => {
               stop(e)
               onAct('stop_instances', row.InstanceId)
             }}
-            disabled={busy || row.State !== 'running'}
-            className={`${iconBtn} text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40`}
-            title="Stop"
-          >
-            <Square className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
+          />
+          <RowAction
+            label="Delete"
+            icon={<Trash2 />}
+            className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40"
+            disabled={busy || row.State === 'terminated'}
             onClick={(e) => {
               stop(e)
               onAct('terminate_instances', row.InstanceId)
             }}
-            disabled={busy || row.State === 'terminated'}
-            className={`${iconBtn} text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40`}
-            title="Delete"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          />
         </div>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   )
 }

@@ -3,6 +3,7 @@ import { runQuery } from '../api/proxy'
 import type { InstanceRow } from '../lib/ec2'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
+import { Badge } from '@/components/ui/badge'
 import { Card } from './Card'
 import { ErrorAlert } from './ErrorAlert'
 
@@ -17,9 +18,9 @@ function useScope() {
 }
 
 function Fact({ label, value }: { label: string; value: string | number | undefined }) {
-  return <div className="flex justify-between gap-3 border-b border-gray-100 py-2 text-sm last:border-0 dark:border-gray-800">
-    <dt className="shrink-0 text-gray-500 dark:text-gray-400">{label}</dt>
-    <dd className="min-w-0 break-words text-right font-medium text-gray-800 dark:text-gray-100">{value ?? 'Not provided'}</dd>
+  return <div className="flex justify-between gap-3 border-b py-2 text-sm last:border-0">
+    <dt className="shrink-0 text-muted-foreground">{label}</dt>
+    <dd className="min-w-0 break-words text-right font-medium">{value ?? 'Not provided'}</dd>
   </div>
 }
 
@@ -54,9 +55,9 @@ export function ImageHardwareCard({ row }: { row: InstanceRow }) {
       <Fact label="Memory" value={type?.MemoryInfo?.SizeInMiB != null ? `${type.MemoryInfo.SizeInMiB / 1024} GiB (${type.MemoryInfo.SizeInMiB.toLocaleString()} MiB)` : hardware.isFetching ? 'Loading…' : 'Unavailable'} />
       <Fact label="Processor" value={arch === 'x86_64' ? '64-bit Intel / AMD' : arch === 'arm64' ? '64-bit ARM' : arch} />
     </dl>
-    {ami?.Description && <p className="mt-3 break-words text-xs text-gray-500">{ami.Description}</p>}
+    {ami?.Description && <p className="mt-3 break-words text-xs text-muted-foreground">{ami.Description}</p>}
     {image.isError && <ErrorAlert error={image.error} />}
-    {!!imageId && image.isSuccess && !ami && <p className="mt-2 text-xs text-gray-500">The original image may have been removed or may no longer be accessible.</p>}
+    {!!imageId && image.isSuccess && !ami && <p className="mt-2 text-xs text-muted-foreground">The original image may have been removed or may no longer be accessible.</p>}
     {hardware.isError && <ErrorAlert error={hardware.error} />}
   </Card>
 }
@@ -75,7 +76,7 @@ function HealthResult({ label, check }: { label: string; check?: HealthCheck }) 
   const labels: Record<string, string> = { ok: 'Passed', impaired: 'Needs attention', initializing: 'Checking…', 'insufficient-data': 'Waiting for data', 'not-applicable': 'Not applicable' }
   return <div className="flex items-center justify-between gap-3 py-2 text-sm">
     <span>{label}</span>
-    <span className={`rounded px-2 py-1 text-xs font-medium ${status === 'ok' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : status === 'impaired' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}>{labels[status ?? ''] ?? 'Unavailable'}</span>
+    <Badge variant="secondary" className={`border-transparent ${status === 'ok' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : status === 'impaired' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : ''}`}>{labels[status ?? ''] ?? 'Unavailable'}</Badge>
   </div>
 }
 
@@ -89,15 +90,15 @@ export function InstanceHealthCard({ row }: { row: InstanceRow }) {
   })
   const status = health.data?.InstanceStatuses?.find((entry) => entry.InstanceId === row.InstanceId)
   return <Card title="Server health">
-    <p className="mb-3 text-xs text-gray-500">AWS checks the server, its host hardware, and attached disk connectivity. These checks do not test your application.</p>
-    {health.isError ? <ErrorAlert error={health.error} /> : health.isPending ? <p className="text-sm text-gray-500">Loading health checks…</p> : <>
-      {row.State !== 'running' && <p className="mb-2 text-xs text-gray-500">Health checks may not be available while the server is {row.State}.</p>}
+    <p className="mb-3 text-xs text-muted-foreground">AWS checks the server, its host hardware, and attached disk connectivity. These checks do not test your application.</p>
+    {health.isError ? <ErrorAlert error={health.error} /> : health.isPending ? <p className="text-sm text-muted-foreground">Loading health checks…</p> : <>
+      {row.State !== 'running' && <p className="mb-2 text-xs text-muted-foreground">Health checks may not be available while the server is {row.State}.</p>}
       <HealthResult label="Server reachability" check={status?.InstanceStatus} />
       <HealthResult label="AWS host hardware" check={status?.SystemStatus} />
       <HealthResult label="Attached disk connectivity" check={status?.AttachedEbsStatus} />
-      {!!status?.Events?.length && <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+      {!!status?.Events?.length && <div className="mt-3 border-t pt-3">
         <h3 className="text-sm font-medium">Scheduled AWS events</h3>
-        {status.Events.map((event, index) => <div key={index} className="mt-2 text-xs text-gray-500">
+        {status.Events.map((event, index) => <div key={index} className="mt-2 text-xs text-muted-foreground">
           <p>{event.Description || event.Code || 'Scheduled event'}</p>
           {event.NotBefore && <p>Starts: {new Date(event.NotBefore).toLocaleString()}</p>}
           {event.NotAfter && <p>Ends: {new Date(event.NotAfter).toLocaleString()}</p>}
@@ -134,7 +135,7 @@ function traffic(rule: Rule) {
 function RuleList({ title, rules, direction }: { title: string; rules: Rule[]; direction: 'from' | 'to' }) {
   return <div className="mt-3">
     <h4 className="text-sm font-medium">{title}</h4>
-    {rules.length === 0 && <p className="mt-1 text-xs text-gray-500">No {direction === 'from' ? 'incoming' : 'outgoing'} rules in this group.</p>}
+    {rules.length === 0 && <p className="mt-1 text-xs text-muted-foreground">No {direction === 'from' ? 'incoming' : 'outgoing'} rules in this group.</p>}
     {rules.map((rule, index) => {
       const peers = [
         ...(rule.IpRanges ?? []).map((p) => ({ label: p.CidrIp === '0.0.0.0/0' ? 'Anywhere on the internet (IPv4)' : p.CidrIp, description: p.Description })),
@@ -142,10 +143,10 @@ function RuleList({ title, rules, direction }: { title: string; rules: Rule[]; d
         ...(rule.UserIdGroupPairs ?? []).map((p) => ({ label: `Security group ${p.GroupName || ''} ${p.GroupId || ''}`.trim(), description: p.Description })),
         ...(rule.PrefixListIds ?? []).map((p) => ({ label: `Address list ${p.PrefixListId || ''}`, description: p.Description })),
       ]
-      return <div key={index} className="mt-2 rounded border border-gray-100 p-2 text-xs dark:border-gray-800">
+      return <div key={index} className="mt-2 rounded-md border p-2 text-xs">
         <p className="font-medium">{traffic(rule)}</p>
-        {peers.length === 0 && <p className="mt-1 text-gray-500">{direction === 'from' ? 'Source' : 'Destination'} not provided</p>}
-        {peers.map((peer, i) => <p key={i} className="mt-1 break-words text-gray-500 dark:text-gray-400">Allow {direction} {peer.label || 'unspecified address'}{peer.description ? ` — ${peer.description}` : ''}</p>)}
+        {peers.length === 0 && <p className="mt-1 text-muted-foreground">{direction === 'from' ? 'Source' : 'Destination'} not provided</p>}
+        {peers.map((peer, i) => <p key={i} className="mt-1 break-words text-muted-foreground">Allow {direction} {peer.label || 'unspecified address'}{peer.description ? ` — ${peer.description}` : ''}</p>)}
       </div>
     })}
   </div>
@@ -162,11 +163,11 @@ export function InstanceFirewallRulesCard({ row }: { row: InstanceRow }) {
     retry: false,
   })
   return <Card title="Allowed network traffic">
-    <p className="text-xs text-gray-500">Rules from the attached security groups combine to allow traffic. Other network settings can still block a connection.</p>
-    {!ids.length ? <p className="mt-3 text-sm text-gray-500">No security groups attached.</p> : query.isError ? <ErrorAlert error={query.error} /> : query.isPending ? <p className="mt-3 text-sm text-gray-500">Loading firewall rules…</p> : !query.data?.SecurityGroups?.length ? <p className="mt-3 text-sm text-gray-500">Attached group details are unavailable.</p> : query.data.SecurityGroups.map((group) => <div key={group.GroupId} className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800">
+    <p className="text-xs text-muted-foreground">Rules from the attached security groups combine to allow traffic. Other network settings can still block a connection.</p>
+    {!ids.length ? <p className="mt-3 text-sm text-muted-foreground">No security groups attached.</p> : query.isError ? <ErrorAlert error={query.error} /> : query.isPending ? <p className="mt-3 text-sm text-muted-foreground">Loading firewall rules…</p> : !query.data?.SecurityGroups?.length ? <p className="mt-3 text-sm text-muted-foreground">Attached group details are unavailable.</p> : query.data.SecurityGroups.map((group) => <div key={group.GroupId} className="mt-4 border-t pt-3">
       <h3 className="break-words text-sm font-semibold">{group.GroupName || 'Security group'}</h3>
-      <p className="text-xs text-gray-500">{group.GroupId}</p>
-      {group.Description && <p className="mt-1 text-xs text-gray-500">{group.Description}</p>}
+      <p className="text-xs text-muted-foreground">{group.GroupId}</p>
+      {group.Description && <p className="mt-1 text-xs text-muted-foreground">{group.Description}</p>}
       <RuleList title="Incoming connections" rules={group.IpPermissions ?? []} direction="from" />
       <RuleList title="Outgoing connections" rules={group.IpPermissionsEgress ?? []} direction="to" />
     </div>)}

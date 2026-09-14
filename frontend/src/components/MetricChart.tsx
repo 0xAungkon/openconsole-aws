@@ -38,14 +38,14 @@ export function MetricChart({ data, height = 160 }: MetricChartProps) {
           x2={width - pad}
           y1={pad + f * (height - pad * 2)}
           y2={pad + f * (height - pad * 2)}
-          className="stroke-gray-100 dark:stroke-gray-800"
+          className="stroke-border"
           strokeWidth={1}
         />
       ))}
       <path
         d={path}
         fill="none"
-        className="stroke-brand-500"
+        className="stroke-primary"
         strokeWidth={2}
         strokeLinejoin="round"
       />

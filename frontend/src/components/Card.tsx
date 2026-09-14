@@ -1,4 +1,12 @@
 import type { ReactNode } from 'react'
+import { cn } from 'cn'
+import {
+  Card as UiCard,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 
 interface CardProps {
   title?: ReactNode
@@ -7,24 +15,26 @@ interface CardProps {
   className?: string
 }
 
-/** Rounded white card with the 1Panel-style vertical blue accent-bar title. */
-export function Card({ title, actions, children, className = '' }: CardProps) {
+/** App card: shadcn Card with the 1Panel-style vertical blue accent-bar title. */
+export function Card({ title, actions, children, className }: CardProps) {
   return (
-    <section
-      className={`rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 ${className}`}
-    >
+    <UiCard className={cn('gap-0 py-0', className)}>
       {(title || actions) && (
-        <header className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 border-b px-4 py-3">
           {title && (
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
-              <span className="inline-block h-4 w-[3px] rounded-full bg-brand-500" />
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <span className="inline-block h-4 w-[3px] rounded-full bg-primary" />
               {title}
-            </h2>
+            </CardTitle>
           )}
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
-        </header>
+          {actions && (
+            <CardAction className="row-span-1 flex items-center gap-2 self-center">
+              {actions}
+            </CardAction>
+          )}
+        </CardHeader>
       )}
-      <div className="p-4">{children}</div>
-    </section>
+      <CardContent className="p-4">{children}</CardContent>
+    </UiCard>
   )
 }

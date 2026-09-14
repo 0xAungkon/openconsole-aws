@@ -2,6 +2,9 @@ import { HistorySyncStatus } from './HistorySyncStatus'
 import { scopedHistoryAction } from '../store/historyEvents'
 import { Download, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { errorMessage } from '../lib/errors'
 import { runCli } from '../api/cli'
 import { useCliStore } from '../store/cliStore'
 import { terminalMarkdown } from '../lib/terminalMarkdown'
@@ -192,7 +195,9 @@ export function CliPanel() {
         })
       }
     } catch (err) {
-      pushOutput({ kind: 'err', text: err instanceof Error ? err.message : String(err) })
+      const message = errorMessage(err)
+      pushOutput({ kind: 'err', text: message })
+      toast.error(message)
     } finally {
       setBusy(false)
     }
@@ -235,31 +240,34 @@ export function CliPanel() {
       onClick={() => inputRef.current?.focus()}
     >
       <div className="flex items-center justify-end border-b border-gray-800 px-3 py-1">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="xs"
           disabled={lines.length === 0}
           onClick={(e) => {
             e.stopPropagation()
             downloadLogs()
+            toast.success('Terminal log downloaded as Markdown')
           }}
-          className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] text-gray-400 transition hover:bg-gray-800 hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+          className="text-gray-400 hover:bg-gray-800 hover:text-gray-200"
           title="Download saved terminal commands and output as Markdown"
         >
-          <Download aria-hidden="true" className="h-3 w-3" />
+          <Download aria-hidden="true" />
           Download Markdown
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={(e) => {
             e.stopPropagation()
             clear()
           }}
-          className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] text-gray-500 transition hover:bg-gray-800 hover:text-gray-300"
+          className="text-gray-500 hover:bg-gray-800 hover:text-gray-300"
           title="Clear terminal"
         >
-          <Trash2 className="h-3 w-3" />
+          <Trash2 />
           Clear
-        </button>
+        </Button>
       </div>
       <HistorySyncStatus />
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2">

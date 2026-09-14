@@ -1,4 +1,13 @@
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import type { Column, Row } from '../types'
 
 interface DataTableProps {
@@ -36,48 +45,45 @@ export function DataTable({ columns, rows }: DataTableProps) {
   }
 
   if (rows.length === 0) {
-    return (
-      <p className="py-6 text-center text-sm text-gray-400">No results.</p>
-    )
+    return <p className="py-6 text-center text-sm text-muted-foreground">No results.</p>
   }
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800">
+      <Table>
+        <TableHeader>
+          <TableRow>
             {columns.map((c) => (
-              <th
+              <TableHead
                 key={c.key}
                 onClick={() => toggleSort(c.key)}
-                className="cursor-pointer select-none px-3 py-2 font-medium hover:text-brand-600"
+                aria-sort={sortKey === c.key ? (asc ? 'ascending' : 'descending') : 'none'}
+                className="cursor-pointer select-none text-xs uppercase tracking-wide hover:text-primary"
               >
-                {c.label}
-                {sortKey === c.key && (
-                  <span className="ml-1">{asc ? '▲' : '▼'}</span>
-                )}
-              </th>
+                <span className="inline-flex items-center gap-1">
+                  {c.label}
+                  {sortKey === c.key ? (
+                    asc ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
+                  ) : (
+                    <ArrowUpDown className="size-3 opacity-40" />
+                  )}
+                </span>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {sorted.map((row, i) => (
-            <tr
-              key={i}
-              className="border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
-            >
+            <TableRow key={i}>
               {columns.map((c) => (
-                <td
-                  key={c.key}
-                  className="px-3 py-2 font-mono text-xs text-gray-700 dark:text-gray-300"
-                >
+                <TableCell key={c.key} className="font-mono text-xs">
                   {fmt(row[c.key])}
-                </td>
+                </TableCell>
               ))}
-            </tr>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }

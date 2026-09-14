@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/button'
+
 interface StatCounterProps {
   label: string
   value: number | string
@@ -8,17 +10,15 @@ interface StatCounterProps {
 
 export function StatCounter({ label, value, detail, onClick }: StatCounterProps) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
       disabled={!onClick}
-      className="flex flex-1 flex-col items-center gap-0.5 rounded-md px-3 py-2 text-center transition enabled:hover:bg-brand-50 disabled:cursor-default dark:enabled:hover:bg-gray-800"
+      className="flex h-auto flex-1 flex-col items-center gap-0.5 px-3 py-2 text-center whitespace-normal disabled:opacity-100"
     >
-      <span className="text-2xl font-semibold text-brand-600 dark:text-brand-300">
-        {value}
-      </span>
-      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{label}</span>
-      <span className="text-[11px] text-gray-400">{detail ?? ' '}</span>
-    </button>
+      <span className="text-2xl font-semibold text-primary">{value}</span>
+      <span className="text-xs font-medium text-foreground/80">{label}</span>
+      <span className="text-[11px] font-normal text-muted-foreground">{detail ?? ' '}</span>
+    </Button>
   )
 }

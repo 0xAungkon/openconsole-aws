@@ -56,7 +56,7 @@ export function AppLayout() {
   if (mode === 'register') {
     if (profilesQuery.isLoading) {
       return (
-        <div className="flex h-full items-center justify-center text-sm text-gray-400">
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           Loading…
         </div>
       )
@@ -71,7 +71,7 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar title={titleFor(location.pathname)} />
 
-        <main className={`flex-1 overflow-y-auto p-4 ${location.pathname.split('/').filter(Boolean)[1] === 'compute' ? 'bg-white sm:p-6 dark:bg-gray-950' : ''}`}>
+        <main className={`flex-1 overflow-y-auto p-4 ${location.pathname.split('/').filter(Boolean)[1] === 'compute' ? 'bg-card sm:p-6' : ''}`}>
           <Outlet />
         </main>
 

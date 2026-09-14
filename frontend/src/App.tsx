@@ -11,7 +11,8 @@ import { Overview } from './pages/Overview'
 import { ServicePage } from './pages/ServicePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { useAuthStore } from './store/authStore'
-import { Toasts } from './components/Toasts'
+import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { mode, token } = useAuthStore()
@@ -24,8 +25,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
-    <>
-    <Toasts />
+    <TooltipProvider delayDuration={300}>
+    <Toaster position="top-right" offset={{ top: 56, right: 16 }} closeButton richColors />
     <Routes>
       <Route path="/" element={<ModeChooser />} />
       <Route path="/login" element={<AuthPage initialTab="login" />} />
@@ -57,6 +58,6 @@ export default function App() {
 
       <Route path="*" element={<NotFound />} />
     </Routes>
-    </>
+    </TooltipProvider>
   )
 }

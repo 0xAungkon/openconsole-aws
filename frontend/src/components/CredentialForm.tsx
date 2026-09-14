@@ -1,5 +1,16 @@
 import { ChevronRight, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { generateCodename } from '../lib/codename'
 import { AWS_REGIONS } from '../store/sessionStore'
 import { ErrorAlert } from './ErrorAlert'
@@ -33,6 +44,8 @@ interface CredentialFormProps {
   onSubmit: (values: CredentialValues) => void
 }
 
+const Req = () => <span className="text-destructive">*</span>
+
 /**
  * Shared AWS-credential form used by both guest entry and register onboarding.
  * Session token + endpoint URL live under a collapsible "Advanced" section.
@@ -51,11 +64,6 @@ export function CredentialForm({
   )
   const [advancedOpen, setAdvancedOpen] = useState(false)
 
-  const input =
-    'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950'
-  const labelText = 'font-medium text-gray-700 dark:text-gray-200'
-  const req = <span className="text-red-500"> *</span>
-
   return (
     <form
       onSubmit={(e) => {
@@ -65,114 +73,110 @@ export function CredentialForm({
       className="flex flex-col gap-3"
     >
       {withLabel && (
-        <label className="flex flex-col gap-1 text-sm">
-          <span className={labelText}>Name</span>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="cred-label">Name</Label>
           <div className="flex items-center gap-2">
-            <input
-              className={input}
+            <Input
+              id="cred-label"
               placeholder="auto-generated"
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
               required
             />
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="icon"
               onClick={() => setForm((f) => ({ ...f, label: generateCodename() }))}
-              className="shrink-0 rounded-md border border-gray-300 p-2 text-gray-500 hover:bg-gray-50 hover:text-brand-600 dark:border-gray-700 dark:hover:bg-gray-800"
               title="Generate a new name"
+              aria-label="Generate a new name"
             >
-              <RefreshCw className="h-4 w-4" />
-            </button>
+              <RefreshCw />
+            </Button>
           </div>
-        </label>
+        </div>
       )}
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={labelText}>Access key ID{req}</span>
-        <input
-          className={input}
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="cred-access-key">
+          Access key ID <Req />
+        </Label>
+        <Input
+          id="cred-access-key"
           placeholder="AKIA…"
           value={form.access_key_id}
           onChange={(e) => setForm({ ...form, access_key_id: e.target.value })}
           required
         />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={labelText}>Secret access key{req}</span>
-        <input
-          className={input}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="cred-secret">
+          Secret access key <Req />
+        </Label>
+        <Input
+          id="cred-secret"
           type="password"
           placeholder="••••••••••••••••"
           value={form.secret_access_key}
           onChange={(e) => setForm({ ...form, secret_access_key: e.target.value })}
           required
         />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={labelText}>Region</span>
-        <select
-          className={input}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="cred-region">Region</Label>
+        <Select
           value={form.default_region}
-          onChange={(e) => setForm({ ...form, default_region: e.target.value })}
+          onValueChange={(v) => setForm({ ...form, default_region: v })}
         >
-          {AWS_REGIONS.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div>
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((o) => !o)}
-          className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-        >
-          <ChevronRight
-            className={`h-3.5 w-3.5 transition ${advancedOpen ? 'rotate-90' : ''}`}
-          />
-          Advanced
-        </button>
-        {advancedOpen && (
-          <div className="mt-2 flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className={labelText}>Endpoint URL</span>
-              <input
-                className={input}
-                list="endpoint-suggestions"
-                placeholder="Optional — e.g. http://localhost:4566 (Floci/LocalStack)"
-                value={form.endpoint_url}
-                onChange={(e) =>
-                  setForm({ ...form, endpoint_url: e.target.value })
-                }
-              />
-              <datalist id="endpoint-suggestions">
-                <option value="http://localhost:4566" />
-              </datalist>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className={labelText}>Session token</span>
-              <input
-                className={input}
-                placeholder="Optional — for temporary credentials"
-                value={form.session_token}
-                onChange={(e) =>
-                  setForm({ ...form, session_token: e.target.value })
-                }
-              />
-            </label>
-          </div>
-        )}
+          <SelectTrigger id="cred-region" className="w-full">
+            <SelectValue placeholder="Select a region" />
+          </SelectTrigger>
+          <SelectContent>
+            {AWS_REGIONS.map((r) => (
+              <SelectItem key={r} value={r}>
+                {r}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
+      <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+        <CollapsibleTrigger asChild>
+          <Button type="button" variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+            <ChevronRight className={`transition-transform ${advancedOpen ? 'rotate-90' : ''}`} />
+            Advanced
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-2 flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cred-endpoint">Endpoint URL</Label>
+            <Input
+              id="cred-endpoint"
+              list="endpoint-suggestions"
+              placeholder="Optional — e.g. http://localhost:4566 (Floci/LocalStack)"
+              value={form.endpoint_url}
+              onChange={(e) => setForm({ ...form, endpoint_url: e.target.value })}
+            />
+            <datalist id="endpoint-suggestions">
+              <option value="http://localhost:4566" />
+            </datalist>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cred-session-token">Session token</Label>
+            <Input
+              id="cred-session-token"
+              placeholder="Optional — for temporary credentials"
+              value={form.session_token}
+              onChange={(e) => setForm({ ...form, session_token: e.target.value })}
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
       {error != null && <ErrorAlert error={error} />}
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
-      >
+      <Button type="submit" disabled={pending}>
         {pending ? pendingLabel : submitLabel}
-      </button>
+      </Button>
     </form>
   )
 }

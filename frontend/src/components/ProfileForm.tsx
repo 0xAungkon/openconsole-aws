@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { createProfile } from '../api/auth'
 import { testConnection } from '../api/proxy'
 import type { StoredProfile } from '../types'
@@ -42,6 +43,7 @@ export function ProfileForm({ submitLabel = 'Save profile', onSuccess }: Profile
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['profiles'] })
       setActiveProfileId(created.id)
+      toast.success(`Profile “${created.label}” saved`)
       onSuccess?.(created)
     },
   })

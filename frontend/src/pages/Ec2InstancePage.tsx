@@ -16,8 +16,28 @@ import {
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+import { cn } from 'cn'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { runQuery } from '../api/proxy'
 import { Card } from '../components/Card'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { StateBadge } from '../components/StateBadge'
 import { InstanceTypeInput } from '../components/InstanceTypeInput'
@@ -25,23 +45,30 @@ import { ImageHardwareCard, InstanceHealthCard, InstanceFirewallRulesCard } from
 import { flattenInstances, timeAgo, type InstanceRow } from '../lib/ec2'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
-import { useToastStore } from '../store/toastStore'
 
 /** Shared mutation that runs an EC2 operation and refreshes instance/list/volume data. */
 function useEc2Mutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ op, params }: { op: string; params: Record<string, unknown> }) =>
+    mutationFn: ({ op, params }: { op: string; params: Record<string, unknown>; success?: string }) =>
       runQuery('ec2', op, params),
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: ['ec2-instance'] })
       queryClient.invalidateQueries({ queryKey: ['ec2-instances'] })
       queryClient.invalidateQueries({ queryKey: ['ec2-volumes'] })
       queryClient.invalidateQueries({ queryKey: ['ec2-security-groups'] })
       queryClient.invalidateQueries({ queryKey: ['ec2-detail-health'] })
       queryClient.invalidateQueries({ queryKey: ['ec2-detail-rules'] })
+      if (variables.success) toast.success(variables.success)
     },
   })
+}
+
+const POWER_LABEL: Record<string, string> = {
+  start_instances: 'Start requested',
+  stop_instances: 'Stop requested',
+  reboot_instances: 'Reboot requested',
+  terminate_instances: 'Termination requested',
 }
 
 export function Ec2InstancePage() {
@@ -51,6 +78,7 @@ export function Ec2InstancePage() {
   const activeProfileId = useSessionStore((s) => s.activeProfileId)
   const region = useSessionStore((s) => s.region)
   const queryClient = useQueryClient()
+  const [confirmTerminate, setConfirmTerminate] = useState(false)
 
   const needsProfile = mode === 'register' && activeProfileId == null
   const backTo = `/${profile}/compute`
@@ -76,87 +104,94 @@ export function Ec2InstancePage() {
 
   function powerAction(op: string) {
     if (op === 'terminate_instances') {
-      if (!window.confirm(`Terminate ${instanceId}? This permanently deletes the server.`))
-        return
+      setConfirmTerminate(true)
+      return
     }
-    power.mutate({ op, params: { InstanceIds: [instanceId] } })
+    power.mutate({ op, params: { InstanceIds: [instanceId] }, success: `${POWER_LABEL[op]} for ${instanceId}` })
   }
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
-      <button
-        type="button"
+      <Button
+        variant="link"
         onClick={() => navigate(backTo)}
-        className="inline-flex w-fit items-center gap-1.5 rounded-md text-sm text-gray-500 transition hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500 dark:text-gray-400"
+        className="w-fit px-0 text-muted-foreground hover:text-primary"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft />
         Back to servers
-      </button>
+      </Button>
 
       {needsProfile ? (
         <Card title="Server details">
-          <p className="text-sm text-amber-600">
+          <p className="text-sm text-warning">
             Select an AWS profile from the account menu to view this server.
           </p>
         </Card>
       ) : query.isError ? (
         <ErrorAlert error={query.error} />
       ) : query.isLoading ? (
-        <p className="py-16 text-center text-sm text-gray-400">Loading server…</p>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-24 w-full" />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </div>
       ) : !row ? (
         <Card title="Server not found">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             This server no longer exists in {region}.
           </p>
         </Card>
       ) : (
         <>
           {/* Header */}
-          <div className="flex flex-wrap items-center gap-5 rounded-xl border border-gray-200 bg-white p-5 shadow-xs sm:p-6 dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex flex-wrap items-center gap-5 rounded-xl bg-card p-5 ring-1 ring-foreground/10 sm:p-6">
             <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
                 <Cpu aria-hidden="true" className="h-6 w-6" />
               </div>
               <div className="min-w-0">
                 <NameEditor row={row} instanceId={instanceId!} />
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{row.InstanceType} <span className="px-1 text-gray-300 dark:text-gray-600">/</span> {row.AZ || region}</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {row.InstanceType} <span className="px-1 opacity-50">/</span> {row.AZ || region}
+                </p>
               </div>
             </div>
 
-            <div className="flex w-full flex-wrap items-center gap-2 border-t border-gray-100 pt-4 xl:ml-auto xl:w-auto xl:border-0 xl:pt-0 dark:border-gray-800">
-              <button
-                type="button"
-                onClick={refresh}
-                disabled={query.isFetching}
-                className="rounded-md border border-gray-300 p-2 text-gray-500 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                title="Refresh"
-              >
-                <RefreshCw className={`h-4 w-4 ${query.isFetching ? 'animate-spin' : ''}`} />
-              </button>
+            <div className="flex w-full flex-wrap items-center gap-2 border-t pt-4 xl:ml-auto xl:w-auto xl:border-0 xl:pt-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={refresh} disabled={query.isFetching} aria-label="Refresh">
+                    <RefreshCw className={cn(query.isFetching && 'animate-spin')} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh</TooltipContent>
+              </Tooltip>
               <ActionButton
                 label="Start"
-                icon={<Play className="h-4 w-4" />}
+                icon={<Play />}
                 tone="green"
                 disabled={power.isPending || row.State !== 'stopped'}
                 onClick={() => powerAction('start_instances')}
               />
               <ActionButton
                 label="Stop"
-                icon={<Square className="h-4 w-4" />}
+                icon={<Square />}
                 tone="amber"
                 disabled={power.isPending || row.State !== 'running'}
                 onClick={() => powerAction('stop_instances')}
               />
               <ActionButton
                 label="Reboot"
-                icon={<RotateCw className="h-4 w-4" />}
+                icon={<RotateCw />}
                 tone="blue"
                 disabled={power.isPending || row.State !== 'running'}
                 onClick={() => powerAction('reboot_instances')}
               />
               <ActionButton
                 label="Delete"
-                icon={<Trash2 className="h-4 w-4" />}
+                icon={<Trash2 />}
                 tone="red"
                 disabled={power.isPending || row.State === 'terminated'}
                 onClick={() => powerAction('terminate_instances')}
@@ -166,9 +201,9 @@ export function Ec2InstancePage() {
 
           {power.isError && <ErrorAlert error={power.error} />}
 
-          <div className="columns-1 gap-5 lg:columns-2 [&>section]:mb-5 [&>section]:break-inside-avoid">
+          <div className="columns-1 gap-5 lg:columns-2 [&>div]:mb-5 [&>div]:break-inside-avoid">
             <Card title="Overview">
-              <dl className="divide-y divide-gray-100 dark:divide-gray-800">
+              <dl className="divide-y">
                 <Detail label="Status" value={<StateBadge state={row.State} />} />
                 <Detail label="Size" value={row.InstanceType} />
                 <Detail label="Availability zone" value={row.AZ} />
@@ -179,7 +214,7 @@ export function Ec2InstancePage() {
             </Card>
 
             <Card title="Networking">
-              <dl className="divide-y divide-gray-100 dark:divide-gray-800">
+              <dl className="divide-y">
                 <Detail label="Public IP" value={row.PublicIpAddress || 'None'} mono />
                 <Detail label="Private IP" value={row.PrivateIpAddress || 'None'} mono />
                 <Detail label="Public DNS" value={row.PublicDnsName || 'None'} mono />
@@ -198,6 +233,25 @@ export function Ec2InstancePage() {
 
           <InstanceFirewallRulesCard row={row} />
           <VolumesCard instanceId={instanceId!} />
+
+          <ConfirmDialog
+            open={confirmTerminate}
+            title={`Terminate ${instanceId}?`}
+            description="This permanently deletes the server and cannot be undone."
+            confirmLabel="Terminate"
+            pending={power.isPending}
+            onCancel={() => setConfirmTerminate(false)}
+            onConfirm={() =>
+              power.mutate(
+                {
+                  op: 'terminate_instances',
+                  params: { InstanceIds: [instanceId] },
+                  success: `Termination requested for ${instanceId}`,
+                },
+                { onSettled: () => setConfirmTerminate(false) },
+              )
+            }
+          />
         </>
       )}
     </div>
@@ -229,6 +283,7 @@ function NameEditor({ row, instanceId }: { row: InstanceRow; instanceId: string 
       rename.mutate({
         op: 'create_tags',
         params: { Resources: [instanceId], Tags: [{ Key: 'Name', Value: next }] },
+        success: `Renamed to “${next}”`,
       })
     } else {
       setName(row.Name)
@@ -253,20 +308,21 @@ function NameEditor({ row, instanceId }: { row: InstanceRow; instanceId: string 
               }
             }}
             placeholder="Server name"
-            className="-mx-1 min-w-0 max-w-xs border-0 bg-transparent px-1 py-0.5 text-lg font-semibold text-gray-800 focus:outline-none focus:ring-0 dark:text-gray-100"
+            aria-label="Server name"
+            className="-mx-1 min-w-0 max-w-xs rounded border-0 bg-transparent px-1 py-0.5 text-lg font-semibold outline-none ring-2 ring-ring/50"
           />
         ) : (
           <h1
             onClick={() => setEditing(true)}
             title="Click to rename"
-            className="-mx-1 cursor-text truncate rounded px-1 text-lg font-semibold text-gray-800 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800"
+            className="-mx-1 cursor-text truncate rounded px-1 text-lg font-semibold hover:bg-muted"
           >
             {row.Name || 'Unnamed server'}
           </h1>
         )}
         <StateBadge state={row.State} size="md" />
       </div>
-      <p className="font-mono text-xs text-gray-400">{row.InstanceId}</p>
+      <p className="font-mono text-xs text-muted-foreground">{row.InstanceId}</p>
     </div>
   )
 }
@@ -290,29 +346,32 @@ function ConfigCard({ row, instanceId }: { row: InstanceRow; instanceId: string 
       <div className="flex flex-col gap-4">
         {/* Resize */}
         <div>
-          <label htmlFor="resize-instance-type" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
+          <Label htmlFor="resize-instance-type" className="mb-1.5">
             Server size
-          </label>
-          <div className="flex items-center gap-2">
+          </Label>
+          <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              {stopped ? <InstanceTypeInput id="resize-instance-type" value={size} required onChange={setSize} /> : <input id="resize-instance-type" disabled value={row.InstanceType} className="w-full rounded-md border border-gray-300 px-2 py-2 text-sm opacity-60 dark:border-gray-700 dark:bg-gray-950" />}
+              {stopped ? (
+                <InstanceTypeInput id="resize-instance-type" value={size} required onChange={setSize} />
+              ) : (
+                <Input id="resize-instance-type" disabled value={row.InstanceType} />
+              )}
             </div>
-            <button
-              type="button"
+            <Button
               onClick={() =>
                 resize.mutate({
                   op: 'modify_instance_attribute',
                   params: { InstanceId: instanceId, InstanceType: { Value: size.trim() } },
+                  success: `Server size changed to ${size.trim()}`,
                 })
               }
               disabled={!stopped || resize.isPending || !size.trim() || size.trim() === row.InstanceType}
-              className="rounded-md bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-40"
             >
               {resize.isPending ? 'Applying…' : 'Apply'}
-            </button>
+            </Button>
           </div>
           {!stopped && (
-            <p className="mt-1 text-xs text-amber-600">
+            <p className="mt-1 text-xs text-warning">
               Stop the server first to change its size.
             </p>
           )}
@@ -323,29 +382,30 @@ function ConfigCard({ row, instanceId }: { row: InstanceRow; instanceId: string 
           )}
         </div>
 
+        <Separator />
+
         {/* Monitoring */}
-        <div className="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-gray-800">
+        <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            <Label htmlFor="detailed-monitoring" className="text-sm font-medium">
               Detailed monitoring
-            </div>
-            <div className="text-xs text-gray-400">
+            </Label>
+            <div className="text-xs text-muted-foreground">
               {monitoringOn ? 'Enabled' : 'Disabled'}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() =>
+          <Switch
+            id="detailed-monitoring"
+            checked={monitoringOn}
+            disabled={monitor.isPending}
+            onCheckedChange={(next) =>
               monitor.mutate({
-                op: monitoringOn ? 'unmonitor_instances' : 'monitor_instances',
+                op: next ? 'monitor_instances' : 'unmonitor_instances',
                 params: { InstanceIds: [instanceId] },
+                success: `Detailed monitoring ${next ? 'enabled' : 'disabled'}`,
               })
             }
-            disabled={monitor.isPending}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            {monitoringOn ? 'Disable' : 'Enable'}
-          </button>
+          />
         </div>
         {monitor.isError && <ErrorAlert error={monitor.error} />}
       </div>
@@ -396,55 +456,51 @@ function FirewallCard({ row, instanceId }: { row: InstanceRow; instanceId: strin
     <Card
       title={
         <span className="flex items-center gap-2">
-          <Shield className="h-4 w-4 text-brand-500" />
+          <Shield className="h-4 w-4 text-primary" />
           Firewall
         </span>
       }
     >
       {groupsQuery.isLoading ? (
-        <p className="text-sm text-gray-400">Loading firewalls…</p>
+        <p className="text-sm text-muted-foreground">Loading firewalls…</p>
       ) : groups.length === 0 ? (
-        <p className="text-sm text-gray-400">No security groups found in this VPC.</p>
+        <p className="text-sm text-muted-foreground">No security groups found in this VPC.</p>
       ) : (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-muted-foreground">
             Choose which security groups control traffic to this server.
           </p>
           <div className="flex max-h-48 flex-col gap-1 overflow-y-auto">
             {groups.map((g) => (
-              <label
+              <Label
                 key={g.GroupId}
-                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm font-normal hover:bg-muted"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={selected.includes(g.GroupId)}
-                  onChange={() => toggle(g.GroupId)}
-                  className="h-4 w-4 rounded border-gray-300"
+                  onCheckedChange={() => toggle(g.GroupId)}
                 />
                 <span className="min-w-0">
-                  <span className="font-medium text-gray-700 dark:text-gray-200">
-                    {g.GroupName}
-                  </span>
-                  <span className="ml-1 font-mono text-xs text-gray-400">{g.GroupId}</span>
+                  <span className="font-medium">{g.GroupName}</span>
+                  <span className="ml-1 font-mono text-xs text-muted-foreground">{g.GroupId}</span>
                 </span>
-              </label>
+              </Label>
             ))}
           </div>
           <div>
-            <button
-              type="button"
+            <Button
+              size="sm"
               onClick={() =>
                 apply.mutate({
                   op: 'modify_instance_attribute',
                   params: { InstanceId: instanceId, Groups: selected },
+                  success: 'Firewall changes applied',
                 })
               }
               disabled={!changed || selected.length === 0 || apply.isPending}
-              className="rounded-md bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-40"
             >
               {apply.isPending ? 'Applying…' : 'Apply firewall changes'}
-            </button>
+            </Button>
           </div>
           {apply.isError && <ErrorAlert error={apply.error} />}
         </div>
@@ -475,6 +531,7 @@ function TagsCard({ row, instanceId }: { row: InstanceRow; instanceId: string })
           Resources: [instanceId],
           Tags: [{ Key: key.trim(), Value: value.trim() }],
         },
+        success: `Label “${key.trim()}” added`,
       },
       {
         onSuccess: () => {
@@ -489,16 +546,13 @@ function TagsCard({ row, instanceId }: { row: InstanceRow; instanceId: string })
     <Card title="Labels">
       <div className="flex flex-col gap-3">
         {tags.length === 0 ? (
-          <p className="text-sm text-gray-400">No labels on this server yet.</p>
+          <p className="text-sm text-muted-foreground">No labels on this server yet.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {tags.map((t) => (
-              <span
-                key={t.Key}
-                className="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-              >
+              <Badge key={t.Key} variant="secondary" className="h-auto gap-1.5 rounded-md py-1 font-normal">
                 <span>
-                  <span className="text-gray-400">{t.Key}</span> = {t.Value}
+                  <span className="text-muted-foreground">{t.Key}</span> = {t.Value}
                 </span>
                 <button
                   type="button"
@@ -506,42 +560,41 @@ function TagsCard({ row, instanceId }: { row: InstanceRow; instanceId: string })
                     removeTag.mutate({
                       op: 'delete_tags',
                       params: { Resources: [instanceId], Tags: [{ Key: t.Key }] },
+                      success: `Label “${t.Key}” removed`,
                     })
                   }
                   disabled={removeTag.isPending}
-                  className="text-gray-400 hover:text-red-500 disabled:opacity-50"
-                  title="Remove label"
+                  className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+                  aria-label={`Remove label ${t.Key}`}
                 >
-                  <X className="h-3 w-3" />
+                  <X className="size-3" />
                 </button>
-              </span>
+              </Badge>
             ))}
           </div>
         )}
 
-        <div className="flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
-          <input
+        <Separator />
+        <div className="flex items-center gap-2">
+          <Input
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder="Label"
-            className="w-28 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+            aria-label="Label key"
+            className="w-28"
           />
-          <input
+          <Input
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && add()}
             placeholder="Value"
-            className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+            aria-label="Label value"
+            className="flex-1"
           />
-          <button
-            type="button"
-            onClick={add}
-            disabled={!key.trim() || addTag.isPending}
-            className="inline-flex items-center gap-1 rounded-md bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-40"
-          >
-            <Plus className="h-3.5 w-3.5" />
+          <Button onClick={add} disabled={!key.trim() || addTag.isPending}>
+            <Plus />
             Add
-          </button>
+          </Button>
         </div>
         {(addTag.isError || removeTag.isError) && (
           <ErrorAlert error={addTag.error || removeTag.error} />
@@ -558,51 +611,45 @@ function TagsCard({ row, instanceId }: { row: InstanceRow; instanceId: string })
 function BackupCard({ instanceId }: { instanceId: string }) {
   const [name, setName] = useState('')
   const create = useEc2Mutation()
-  const notify = useToastStore((s) => s.add)
 
   return (
     <Card
       title={
         <span className="flex items-center gap-2">
-          <Camera className="h-4 w-4 text-brand-500" />
+          <Camera className="h-4 w-4 text-primary" />
           Backup image
         </span>
       }
     >
       <div className="flex flex-col gap-2">
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted-foreground">
           Save the current state of this server as a reusable image (AMI).
         </p>
         <div className="flex items-center gap-2">
-          <input
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Image name"
-            className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950"
+            aria-label="Image name"
+            className="flex-1"
           />
-          <button
-            type="button"
+          <Button
             onClick={() =>
               create.mutate(
                 {
                   op: 'create_image',
                   params: { InstanceId: instanceId, Name: name.trim() },
+                  success: `Image creation started for “${name.trim()}”. It will appear in your AMIs when ready.`,
                 },
-                {
-                  onSuccess: (_result, variables) => {
-                    setName('')
-                    notify('success', `Image creation started for “${variables.params.Name}”. It will appear in your AMIs when ready.`)
-                  },
-                  onError: (error) => notify('error', `Could not create the backup image: ${error.message}`),
-                },
+                { onSuccess: () => setName('') },
               )
             }
             disabled={!name.trim() || create.isPending}
-            className="rounded-md bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-40"
           >
             {create.isPending ? 'Creating…' : 'Create image'}
-          </button>
+          </Button>
         </div>
+        {create.isError && <ErrorAlert error={create.error} />}
       </div>
     </Card>
   )
@@ -616,6 +663,7 @@ function VolumesCard({ instanceId }: { instanceId: string }) {
   const region = useSessionStore((s) => s.region)
   const activeProfileId = useSessionStore((s) => s.activeProfileId)
   const detach = useEc2Mutation()
+  const [detachId, setDetachId] = useState<string | null>(null)
 
   const volumesQuery = useQuery({
     queryKey: ['ec2-volumes', instanceId, region, activeProfileId],
@@ -631,76 +679,53 @@ function VolumesCard({ instanceId }: { instanceId: string }) {
     <Card
       title={
         <span className="flex items-center gap-2">
-          <HardDrive className="h-4 w-4 text-brand-500" />
+          <HardDrive className="h-4 w-4 text-primary" />
           Disks
         </span>
       }
     >
       {volumesQuery.isLoading ? (
-        <p className="text-sm text-gray-400">Loading disks…</p>
+        <p className="text-sm text-muted-foreground">Loading disks…</p>
       ) : volumes.length === 0 ? (
-        <p className="text-sm text-gray-400">No disks attached.</p>
+        <p className="text-sm text-muted-foreground">No disks attached.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-800">
-                <th className="px-3 py-2 font-medium">Volume ID</th>
-                <th className="px-3 py-2 font-medium">Device</th>
-                <th className="px-3 py-2 font-medium">Size</th>
-                <th className="px-3 py-2 font-medium">Type</th>
-                <th className="px-3 py-2 font-medium">State</th>
-                <th className="px-3 py-2 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs uppercase tracking-wide">Volume ID</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide">Device</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide">Size</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide">Type</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide">State</TableHead>
+                <TableHead className="text-right text-xs uppercase tracking-wide">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {volumes.map((v) => {
                 const device = v.Attachments?.[0]?.Device ?? ''
                 return (
-                  <tr
-                    key={v.VolumeId}
-                    className="border-b border-gray-100 last:border-0 dark:border-gray-800"
-                  >
-                    <td className="px-3 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">
-                      {v.VolumeId}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs text-gray-600 dark:text-gray-400">
-                      {device}
-                    </td>
-                    <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
-                      {v.Size} GiB
-                    </td>
-                    <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
-                      {v.VolumeType}
-                    </td>
-                    <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
-                      {v.State}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Detach ${v.VolumeId}? Detaching the root disk can break the server.`,
-                            )
-                          )
-                            detach.mutate({
-                              op: 'detach_volume',
-                              params: { VolumeId: v.VolumeId },
-                            })
-                        }}
+                  <TableRow key={v.VolumeId}>
+                    <TableCell className="font-mono text-xs">{v.VolumeId}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{device}</TableCell>
+                    <TableCell>{v.Size} GiB</TableCell>
+                    <TableCell>{v.VolumeType}</TableCell>
+                    <TableCell>{v.State}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="destructive"
+                        size="xs"
+                        onClick={() => setDetachId(v.VolumeId)}
                         disabled={detach.isPending}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40 dark:hover:bg-red-950/40"
                       >
                         Detach
-                      </button>
-                    </td>
-                  </tr>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 )
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
       {detach.isError && (
@@ -708,6 +733,21 @@ function VolumesCard({ instanceId }: { instanceId: string }) {
           <ErrorAlert error={detach.error} />
         </div>
       )}
+      <ConfirmDialog
+        open={detachId != null}
+        title={`Detach ${detachId}?`}
+        description="Detaching the root disk can break the server."
+        confirmLabel="Detach"
+        pending={detach.isPending}
+        onCancel={() => setDetachId(null)}
+        onConfirm={() =>
+          detachId &&
+          detach.mutate(
+            { op: 'detach_volume', params: { VolumeId: detachId }, success: `Detach requested for ${detachId}` },
+            { onSettled: () => setDetachId(null) },
+          )
+        }
+      />
     </Card>
   )
 }
@@ -727,25 +767,21 @@ function Detail({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
-      <span className="text-gray-400">{label}</span>
-      <span
-        className={`min-w-0 break-all text-right text-gray-700 dark:text-gray-200 ${
-          mono ? 'font-mono text-xs' : 'font-medium'
-        }`}
-      >
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={cn('min-w-0 break-all text-right', mono ? 'font-mono text-xs' : 'font-medium')}>
         {value}
-      </span>
+      </dd>
     </div>
   )
 }
 
 const TONE_CLASS: Record<string, string> = {
   green:
-    'text-green-700 border-green-200 hover:bg-green-50 dark:text-green-300 dark:border-green-900 dark:hover:bg-green-950/40',
+    'border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-900 dark:text-green-300 dark:hover:bg-green-950/40',
   amber:
-    'text-amber-700 border-amber-200 hover:bg-amber-50 dark:text-amber-300 dark:border-amber-900 dark:hover:bg-amber-950/40',
-  blue: 'text-brand-700 border-brand-200 hover:bg-brand-50 dark:text-brand-300 dark:border-brand-900 dark:hover:bg-brand-900/40',
-  red: 'text-red-700 border-red-200 hover:bg-red-50 dark:text-red-300 dark:border-red-900 dark:hover:bg-red-950/40',
+    'border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-900 dark:text-amber-300 dark:hover:bg-amber-950/40',
+  blue: 'border-primary/30 text-primary hover:bg-accent hover:text-accent-foreground',
+  red: 'border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40',
 }
 
 function ActionButton({
@@ -762,14 +798,9 @@ function ActionButton({
   onClick: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-900 ${TONE_CLASS[tone]}`}
-    >
+    <Button variant="outline" onClick={onClick} disabled={disabled} className={TONE_CLASS[tone]}>
       {icon}
       {label}
-    </button>
+    </Button>
   )
 }

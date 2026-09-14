@@ -7,6 +7,7 @@ import { GaugeRing } from '../components/GaugeRing'
 import { MetricChart } from '../components/MetricChart'
 import { ResourceList } from '../components/ResourceList'
 import { StatCounter } from '../components/StatCounter'
+import { Textarea } from '@/components/ui/textarea'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
@@ -89,7 +90,7 @@ export function Overview() {
             <StatCounter label="NoSQL" value={val(tables)} detail={unit(tables, 'tables')} onClick={() => navigate(`/${profile}/nosql`)} />
           </div>
           {!enabled && (
-            <p className="mt-2 text-xs text-amber-600">
+            <p className="mt-2 text-xs text-warning">
               Connect a profile to load live counts.
             </p>
           )}
@@ -124,14 +125,14 @@ export function Overview() {
           </div>
         </Card>
 
-        <Card title="Monitoring" actions={<span className="text-xs text-gray-400">CPU (sample)</span>}>
+        <Card title="Monitoring" actions={<span className="text-xs text-muted-foreground">CPU (sample)</span>}>
           <MetricChart data={series} />
         </Card>
       </div>
 
       <div className="flex flex-col gap-4">
         <Card title="Memo">
-          <textarea
+          <Textarea
             value={memo}
             onChange={(e) => {
               setMemo(e.target.value)
@@ -139,7 +140,7 @@ export function Overview() {
             }}
             placeholder="Scratch notes (saved in this browser)…"
             rows={4}
-            className="w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-gray-800 dark:bg-gray-950"
+            className="resize-none"
           />
         </Card>
 
