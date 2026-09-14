@@ -42,3 +42,33 @@ def test_register_without_schema_returns_503_with_hint(client_without_schema):
     assert body["code"] == "DatabaseError"
     assert "alembic upgrade head" in body["detail"]
     assert "no such table" in body["detail"]
+
+
+def test_missing_encryption_key_returns_503_with_hint(client, monkeypatch):
+    """Saving a profile without ENCRYPTION_KEY must explain the fix, not 500."""
+    from app.utils import crypto
+
+    monkeypatch.setattr(crypto.settings, "encryption_key", "")
+    crypto._fernet.cache_clear()
+    try:
+        reg = client.post(
+            "/api/auth/register",
+            json={"name": "T", "email": "cfg@example.com", "password": "secret123"},
+        )
+        token = reg.json()["access_token"]
+        resp = client.post(
+            "/api/credentials",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "label": "p",
+                "access_key_id": "test",
+                "secret_access_key": "test",
+                "default_region": "us-east-1",
+            },
+        )
+    finally:
+        crypto._fernet.cache_clear()
+    assert resp.status_code == 503
+    body = resp.json()
+    assert body["code"] == "ConfigurationError"
+    assert "ENCRYPTION_KEY is not set" in body["detail"]

@@ -6,21 +6,28 @@ credentials are never persisted and never pass through here.
 
 from functools import lru_cache
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 
 from app.config import settings
+from app.errors import ConfigurationError
+
+_KEYGEN_HINT = (
+    'Generate one with: python -c "from cryptography.fernet import Fernet; '
+    'print(Fernet.generate_key().decode())" and put it in backend/.env'
+)
 
 
 @lru_cache
 def _fernet() -> Fernet:
     key = settings.encryption_key
-    if not key:
-        raise RuntimeError(
-            "ENCRYPTION_KEY is not set. Generate one with: "
-            'python -c "from cryptography.fernet import Fernet; '
-            'print(Fernet.generate_key().decode())"'
-        )
-    return Fernet(key.encode() if isinstance(key, str) else key)
+    if not key or key == "change-me":
+        raise ConfigurationError(f"ENCRYPTION_KEY is not set. {_KEYGEN_HINT}")
+    try:
+        return Fernet(key.encode() if isinstance(key, str) else key)
+    except (ValueError, TypeError) as exc:
+        raise ConfigurationError(
+            f"ENCRYPTION_KEY is not a valid Fernet key ({exc}). {_KEYGEN_HINT}"
+        ) from exc
 
 
 def encrypt(plaintext: str) -> str:
@@ -28,4 +35,10 @@ def encrypt(plaintext: str) -> str:
 
 
 def decrypt(token: str) -> str:
-    return _fernet().decrypt(token.encode()).decode()
+    try:
+        return _fernet().decrypt(token.encode()).decode()
+    except InvalidToken as exc:
+        raise ConfigurationError(
+            "Stored credentials cannot be decrypted with the current ENCRYPTION_KEY. "
+            "The key has changed since this profile was saved; delete and re-create the profile."
+        ) from exc
