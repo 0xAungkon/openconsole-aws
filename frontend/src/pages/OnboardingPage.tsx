@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { BrandLogo } from '../components/BrandLogo'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { listProfiles } from '../api/auth'
 import { ProfileForm } from '../components/ProfileForm'
@@ -41,7 +42,8 @@ export function OnboardingPage() {
   return (
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-md">
-        <CardHeader>
+        <CardHeader className="relative">
+          <ThemeToggle className="absolute top-0 right-4" />
           <div className="mb-3 flex justify-center">
             <BrandLogo size="lg" />
           </div>

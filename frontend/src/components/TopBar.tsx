@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Check, Plus, UserCircle2 } from 'lucide-react'
+import { Check, Plus, User } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ import {
 import { listProfiles } from '../api/auth'
 import { slugify } from '../lib/slug'
 import { useAuthStore } from '../store/authStore'
+import { ThemeToggle } from './ThemeToggle'
 import { AWS_REGIONS, useSessionStore } from '../store/sessionStore'
 
 export function TopBar({ title }: { title: string }) {
@@ -41,7 +42,7 @@ export function TopBar({ title }: { title: string }) {
     <header className="flex items-center justify-between border-b bg-card px-4 py-2">
       <h1 className="text-sm font-medium">{title}</h1>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <Select value={region} onValueChange={setRegion}>
           <SelectTrigger size="sm" aria-label="Region" className="w-40 text-xs">
             <SelectValue placeholder="Region" />
@@ -63,8 +64,8 @@ export function TopBar({ title }: { title: string }) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Account" className="rounded-full text-muted-foreground hover:text-primary">
-              <UserCircle2 className="size-7" />
+            <Button variant="outline" size="icon" aria-label="Account" className="text-muted-foreground hover:text-primary">
+              <User />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -114,6 +115,8 @@ export function TopBar({ title }: { title: string }) {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <ThemeToggle variant="outline" />
       </div>
     </header>
   )

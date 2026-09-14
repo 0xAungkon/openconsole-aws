@@ -1,5 +1,4 @@
 import { Check, Monitor, Moon, Sun } from 'lucide-react'
-import { toast } from 'sonner'
 import { cn } from 'cn'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -22,10 +21,7 @@ export function ThemeSettingsCard() {
           <Label>Theme</Label>
           <Tabs
             value={mode}
-            onValueChange={(v) => {
-              setMode(v as ThemeMode)
-              toast.success(`Theme set to ${v}`, { id: 'theme' })
-            }}
+            onValueChange={(v) => setMode(v as ThemeMode)}
           >
             <TabsList className="w-full sm:w-auto">
               {MODES.map((m) => (
@@ -54,10 +50,7 @@ export function ThemeSettingsCard() {
                   aria-checked={active}
                   aria-label={c.label}
                   title={c.label}
-                  onClick={() => {
-                    setColor(c.key as ThemeColor)
-                    toast.success(`Accent color set to ${c.label}`, { id: 'theme' })
-                  }}
+                  onClick={() => setColor(c.key as ThemeColor)}
                   className={cn(
                     'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring',
                     active && 'border-primary bg-accent text-accent-foreground',

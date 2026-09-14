@@ -26,7 +26,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 export default function App() {
   return (
     <TooltipProvider delayDuration={300}>
-    <Toaster position="top-right" offset={{ top: 56, right: 16 }} closeButton richColors />
+    <Toaster position="bottom-right" offset={{ bottom: 48, right: 16 }} closeButton richColors />
     <Routes>
       <Route path="/" element={<ModeChooser />} />
       <Route path="/login" element={<AuthPage initialTab="login" />} />

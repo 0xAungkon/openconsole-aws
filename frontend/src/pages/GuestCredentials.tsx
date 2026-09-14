@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { BrandLogo } from '../components/BrandLogo'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { testConnection } from '../api/proxy'
 import { CredentialForm, type CredentialValues } from '../components/CredentialForm'
@@ -47,7 +48,8 @@ export function GuestCredentials() {
   return (
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-md">
-        <CardHeader>
+        <CardHeader className="relative">
+          <ThemeToggle className="absolute top-0 right-4" />
           <div className="mb-3 flex justify-center">
             <BrandLogo size="lg" />
           </div>

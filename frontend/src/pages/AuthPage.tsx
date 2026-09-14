@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { login, register } from '../api/auth'
 import { errorMessage } from '../lib/errors'
 import { BrandLogo } from '../components/BrandLogo'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { useAuthStore } from '../store/authStore'
 
@@ -54,7 +55,8 @@ export function AuthPage({ initialTab = 'login' }: { initialTab?: Tab }) {
   return (
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-sm">
-        <CardHeader>
+        <CardHeader className="relative">
+          <ThemeToggle className="absolute top-0 right-4" />
           <div className="mb-3 flex justify-center">
             <BrandLogo size="lg" />
           </div>

@@ -330,3 +330,11 @@ body,
     cursor: default;
   }
 }
+
+/* Toasts: bold message text. */
+[data-sonner-toast] [data-title] {
+  font-weight: 700;
+}
+[data-sonner-toast] [data-description] {
+  font-weight: 600;
+}
