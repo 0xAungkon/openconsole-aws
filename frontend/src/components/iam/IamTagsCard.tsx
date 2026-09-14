@@ -30,7 +30,7 @@ export function IamTagsCard({ entity, id }: { entity: keyof typeof OPS; id: stri
     queryFn: () => runQuery<{ Tags?: { Key: string; Value: string }[] }>('iam', ops.list, { ...base }),
     retry: false,
   })
-  const tags = q.data?.Tags ?? []
+  const tags = (q.data?.Tags ?? []).filter((t) => t.Key !== 'Name')
   const add = useMutation({
     mutationFn: () => runQuery('iam', ops.tag, { ...base, Tags: [{ Key: key.trim(), Value: value.trim() }] }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['iam-tags', entity, id] }); toast.success(`Label “${key.trim()}” added`); setKey(''); setValue('') },

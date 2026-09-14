@@ -1,3 +1,5 @@
+import { runQuery } from '../api/proxy'
+
 export interface IamUser { UserName: string; UserId: string; Arn: string; CreateDate: string; PasswordLastUsed?: string; Path: string }
 export interface IamRole { RoleName: string; RoleId: string; Arn: string; CreateDate: string; Description?: string; AssumeRolePolicyDocument?: any; MaxSessionDuration?: number; RoleLastUsed?: { LastUsedDate?: string; Region?: string }; Path: string }
 export interface IamGroup { GroupName: string; GroupId: string; Arn: string; CreateDate: string; Path: string }
@@ -128,3 +130,51 @@ export function validateJsonPolicy(text: string): { doc: any } | { error: string
     return { error: `Invalid JSON: ${(e as Error).message}` }
   }
 }
+
+/** Paginate any IAM list_* call. */
+export async function listAll<T>(op: string, key: string, params: Record<string, unknown> = {}): Promise<T[]> {
+  const all: T[] = []
+  let marker: string | undefined
+  do {
+    const p = await runQuery<any>('iam', op, { MaxItems: 1000, ...params, ...(marker ? { Marker: marker } : {}) })
+    all.push(...(p[key] ?? []))
+    marker = p.IsTruncated ? p.Marker : undefined
+  } while (marker)
+  return all
+}
+
+
+/* ---------------- safe deletes (IAM refuses to delete entities with dependencies) ---------------- */
+
+export async function deleteUserCompletely(UserName: string) {
+  for (const p of await listAll<{ PolicyArn: string }>('list_attached_user_policies', 'AttachedPolicies', { UserName })) await runQuery('iam', 'detach_user_policy', { UserName, PolicyArn: p.PolicyArn })
+  for (const n of await listAll<string>('list_user_policies', 'PolicyNames', { UserName })) await runQuery('iam', 'delete_user_policy', { UserName, PolicyName: n })
+  for (const g of await listAll<{ GroupName: string }>('list_groups_for_user', 'Groups', { UserName })) await runQuery('iam', 'remove_user_from_group', { UserName, GroupName: g.GroupName })
+  for (const k of await listAll<{ AccessKeyId: string }>('list_access_keys', 'AccessKeyMetadata', { UserName })) await runQuery('iam', 'delete_access_key', { UserName, AccessKeyId: k.AccessKeyId })
+  for (const m of await listAll<{ SerialNumber: string }>('list_mfa_devices', 'MFADevices', { UserName })) await runQuery('iam', 'deactivate_mfa_device', { UserName, SerialNumber: m.SerialNumber })
+  try { await runQuery('iam', 'delete_login_profile', { UserName }) } catch { /* no console password */ }
+  await runQuery('iam', 'delete_user', { UserName })
+}
+export async function deleteRoleCompletely(RoleName: string) {
+  for (const p of await listAll<{ PolicyArn: string }>('list_attached_role_policies', 'AttachedPolicies', { RoleName })) await runQuery('iam', 'detach_role_policy', { RoleName, PolicyArn: p.PolicyArn })
+  for (const n of await listAll<string>('list_role_policies', 'PolicyNames', { RoleName })) await runQuery('iam', 'delete_role_policy', { RoleName, PolicyName: n })
+  for (const ip of await listAll<{ InstanceProfileName: string }>('list_instance_profiles_for_role', 'InstanceProfiles', { RoleName })) await runQuery('iam', 'remove_role_from_instance_profile', { RoleName, InstanceProfileName: ip.InstanceProfileName })
+  await runQuery('iam', 'delete_role', { RoleName })
+}
+export async function deleteGroupCompletely(GroupName: string) {
+  const g = await runQuery<{ Users?: { UserName: string }[] }>('iam', 'get_group', { GroupName })
+  for (const u of g.Users ?? []) await runQuery('iam', 'remove_user_from_group', { GroupName, UserName: u.UserName })
+  for (const p of await listAll<{ PolicyArn: string }>('list_attached_group_policies', 'AttachedPolicies', { GroupName })) await runQuery('iam', 'detach_group_policy', { GroupName, PolicyArn: p.PolicyArn })
+  for (const n of await listAll<string>('list_group_policies', 'PolicyNames', { GroupName })) await runQuery('iam', 'delete_group_policy', { GroupName, PolicyName: n })
+  await runQuery('iam', 'delete_group', { GroupName })
+}
+export async function deletePolicyCompletely(PolicyArn: string) {
+  const ents = await runQuery<{ PolicyUsers?: { UserName: string }[]; PolicyRoles?: { RoleName: string }[]; PolicyGroups?: { GroupName: string }[] }>('iam', 'list_entities_for_policy', { PolicyArn, MaxItems: 1000 })
+  for (const u of ents.PolicyUsers ?? []) await runQuery('iam', 'detach_user_policy', { UserName: u.UserName, PolicyArn })
+  for (const r of ents.PolicyRoles ?? []) await runQuery('iam', 'detach_role_policy', { RoleName: r.RoleName, PolicyArn })
+  for (const g of ents.PolicyGroups ?? []) await runQuery('iam', 'detach_group_policy', { GroupName: g.GroupName, PolicyArn })
+  const v = await runQuery<{ Versions?: { VersionId: string; IsDefaultVersion?: boolean }[] }>('iam', 'list_policy_versions', { PolicyArn })
+  for (const ver of v.Versions ?? []) if (!ver.IsDefaultVersion) await runQuery('iam', 'delete_policy_version', { PolicyArn, VersionId: ver.VersionId })
+  await runQuery('iam', 'delete_policy', { PolicyArn })
+}
+

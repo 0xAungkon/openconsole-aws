@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './pages/AppLayout'
+import { AccessPage } from './pages/AccessPage'
 import { AuthPage } from './pages/AuthPage'
+import { IamGroupPage } from './pages/IamGroupPage'
+import { IamPolicyPage } from './pages/IamPolicyPage'
+import { IamRolePage } from './pages/IamRolePage'
+import { IamUserPage } from './pages/IamUserPage'
 import { BucketPage } from './pages/BucketPage'
 import { DatabasePage } from './pages/DatabasePage'
 import { DatabasesPage } from './pages/DatabasesPage'
@@ -69,6 +74,11 @@ export default function App() {
         <Route path="databases/:id" element={<DatabasePage />} />
         <Route path="nosql" element={<TablesPage />} />
         <Route path="nosql/:table" element={<TablePage />} />
+        <Route path="access" element={<AccessPage />} />
+        <Route path="access/users/:name" element={<IamUserPage />} />
+        <Route path="access/roles/:name" element={<IamRolePage />} />
+        <Route path="access/groups/:name" element={<IamGroupPage />} />
+        <Route path="access/policies/:arn" element={<IamPolicyPage />} />
         <Route path=":service" element={<ServicePage />} />
       </Route>
 
