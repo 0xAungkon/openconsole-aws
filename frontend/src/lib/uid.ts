@@ -3,7 +3,7 @@
  *
  * `crypto.randomUUID()` is only exposed in *secure* contexts. This app is
  * routinely opened over plain HTTP on a LAN/Tailscale IP (e.g.
- * http://100.106.225.24:8000), where `crypto.randomUUID` is simply
+ * http://100.106.225.24:4567), where `crypto.randomUUID` is simply
  * `undefined` and every call throws `TypeError: crypto.randomUUID is not a
  * function`. `localhost` counts as trustworthy, so the failure stays hidden
  * during local development and only shows up on the network URL.

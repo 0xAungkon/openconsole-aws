@@ -2,7 +2,7 @@
 
 ### AWS for Homosapiens
 
-![AWS OpenConsole overview](Assets/overview.png)
+![AWS OpenConsole overview](assets/overview.png)
 
 Skip the command line. OpenConsole is a graphical console for the AWS services
 you use every day — spin up servers, manage files, deploy functions and control
@@ -74,16 +74,35 @@ mode your credentials stay server-side.
 uvx --from "git+https://github.com/0xAungkon/openconsole-aws" aws-openconsole
 ```
 
-Then open **http://127.0.0.1:8000**.
+Then open **http://127.0.0.1:4567**.
 
 That is the entire install: the compiled UI and the database migrations ship
 inside the package, so there is nothing to clone, no `npm install`, and no
 setup commands. The only requirement is [uv](https://docs.astral.sh/uv/).
 
 Options: `--host 0.0.0.0` to reach it from your phone or another machine,
-`--port 9000` to move it off 8000.
+`--port 9000` to move it off 4567.
 
 Once published to PyPI the command shortens to `uvx aws-openconsole`.
+
+### Or run it with Docker
+
+```bash
+docker compose up -d
+```
+
+Then open **http://localhost:4567** — same port either way.
+
+No Python or Node required: the image bundles the already-compiled UI, runs as
+a non-root user, and keeps SQLite in a named volume so your data survives
+rebuilds and `docker compose down`.
+
+To be able to store AWS profiles in register mode, pass the two secrets (the
+comments in `docker-compose.yml` show how to generate them):
+
+```bash
+JWT_SECRET=... ENCRYPTION_KEY=... docker compose up -d
+```
 
 ### Configuration (optional)
 
@@ -103,10 +122,10 @@ app reads `./.env` from the directory you start it in.
 
 ```bash
 uv sync                              # Python dependencies
-uv run aws-openconsole --reload      # API + UI on :8000; rebuilds the UI when sources change
+uv run aws-openconsole --reload      # API + UI on :4567; rebuilds the UI when sources change
 
 cd frontend && npm install           # only needed for hot-reload UI work
-npm run dev                          # http://localhost:5173, talks to :8000
+npm run dev                          # http://localhost:5173, talks to :4567
 npm run build                        # typecheck + rebuild the bundled UI
 ```
 

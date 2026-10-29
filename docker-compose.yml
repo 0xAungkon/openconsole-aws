@@ -1,0 +1,48 @@
+# AWS OpenConsole — one service, one port, persistent database.
+#
+#   docker compose up -d        # then open http://localhost:4567
+#   docker compose down         # stops; the database volume survives
+#
+# JWT_SECRET and ENCRYPTION_KEY are intentionally NOT set here so they never
+# land in a committed file. Until they are provided the app still runs, but
+# register mode cannot store AWS profiles. Generate a pair with:
+#
+#   python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+#   openssl rand -hex 32
+#
+#   JWT_SECRET=... ENCRYPTION_KEY=... docker compose up -d
+#
+# or put them in an untracked `.env` next to this file — Compose reads it
+# automatically (that is a Compose convention, and .dockerignore keeps the
+# same file out of the image).
+
+services:
+  openconsole:
+    build: .
+    image: aws-openconsole:local
+    container_name: aws-openconsole
+    ports:
+      - "4567:4567"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+    volumes:
+      # SQLite lives here rather than in the container layer, so upgrades and
+      # `docker compose down --rmi local` don't take your data with them.
+      - openconsole-data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/app/.venv/bin/python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4567/api/health', timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  openconsole-data:

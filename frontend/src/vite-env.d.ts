@@ -2,7 +2,7 @@
 
 interface ImportMetaEnv {
   /**
-   * Base URL of the FastAPI backend, e.g. http://localhost:8000.
+   * Base URL of the FastAPI backend, e.g. http://localhost:4567.
    * Empty (or unset) means same-origin — see `src/api/baseUrl.ts`.
    */
   readonly VITE_API_URL?: string

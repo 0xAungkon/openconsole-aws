@@ -1,14 +1,19 @@
 /**
- * Base URL for every backend request.
+ * Base URL for every backend request — deliberately empty by default.
  *
- * - Cross-origin flows (`npm run dev`, `npm run preview`) take it from
- *   `VITE_API_URL` in `.env`, e.g. `http://localhost:8000`.
- * - The embedded build (`vite build --mode embedded`, driven by the backend on
- *   startup) loads `.env.embedded`, which sets `VITE_API_URL` to "" so the
- *   bundle — served by FastAPI itself at "/" — talks to its own origin.
+ * The frontend never needs to know the backend's hostname or port: requests
+ * are relative (`/api/...`), so they land on whatever origin served the page.
+ * That is what lets the embedded bundle work unchanged on localhost, a LAN or
+ * tailnet IP, or a public domain, on any port, with nothing baked in at build
+ * time.
  *
- * Unset falls back to the dev server's default in dev, and to same-origin in a
- * production build (the correct default for a bundle served by the backend).
+ * `npm run dev` and `npm run preview` proxy `/api` to the backend for exactly
+ * the same reason (see `vite.config.ts`), so development is same-origin too
+ * and no CORS entry is needed.
+ *
+ * Set `VITE_API_URL` only when the API genuinely lives on a *different*
+ * origin — a frontend deployed separately from the backend, e.g.
+ *
+ *     VITE_API_URL=https://api.example.com npm run build
  */
-export const API_BASE_URL: string =
-  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8000' : '')
+export const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? ''

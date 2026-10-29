@@ -11,7 +11,7 @@ AWS OpenConsole — a GUI for managing AWS (an "AWS CLI GUI"). A Vite/React/Type
 Python package (managed with **uv**, Python 3.13, run from the repo root):
 ```bash
 uv sync                                       # install deps
-uv run aws-openconsole --reload               # http://127.0.0.1:8000 — serves the API + compiled UI, runs migrations on startup
+uv run aws-openconsole --reload               # http://127.0.0.1:4567 — serves the API + compiled UI, runs migrations on startup
 uv run aws-openconsole --host 0.0.0.0         # expose on the LAN / tailnet
 uv run pytest                                 # full test suite (25 tests)
 uv run pytest tests/test_cli.py         # a single test file
@@ -26,19 +26,15 @@ Frontend (`cd frontend`, Node 20+, `npm install`):
 ```bash
 npm run dev        # http://localhost:5173
 npm run build      # tsc -b && vite build — run this to typecheck; the build FAILS on unused vars
-npm run preview    # serve the built bundle on http://localhost:4173 (/api proxied to :8000)
+npm run preview    # serve the built bundle on http://localhost:4173 (/api proxied to :4567)
 npm run lint       # oxlint
 ```
 
 **Embedded frontend**: the compiled bundle lives in `aws_openconsole/frontend_dist/` and is served at `/`, so one process gives the whole app. That directory is **committed on purpose, not gitignored** — it ships inside the wheel, which is what lets `uvx aws-openconsole` serve a working UI with no Node installed. Deleting or ignoring it breaks every installed copy. When run from a git checkout with `frontend/node_modules` present, `aws_openconsole/services/frontend.py` recompiles it on startup if the sources are newer; when installed from a wheel there is no `frontend/` source, so it logs "serving the bundled UI build" and skips the build. It registers a catch-all `GET /{path}` *after* every API route, so API/docs always win and unknown paths return `index.html` for React Router. `AUTO_BUILD_FRONTEND=false` disables the build (tests set this). Because `npm run build` and the backend build share that output dir, both must emit same-origin bundles — see the `.env.*` modes below.
 
-**Vite env modes** (mode files override `.env`; a real env var overrides everything):
+**The bundle is origin-agnostic.** It always issues *relative* `/api/...` requests, so it never learns the backend's hostname or port — the same build works on localhost, a LAN/tailnet IP, or a public domain, on any port. `src/api/baseUrl.ts` returns `""` unless `VITE_API_URL` is set, and that variable is now **deliberately undefined everywhere**: set it only when the frontend is deployed on a genuinely different origin from the API.
 
-| File | Used by | `VITE_API_URL` |
-| --- | --- | --- |
-| `.env` | dev, all modes | `http://localhost:8000` (cross-origin, CORS) |
-| `.env.production` | `npm run build` | empty → same-origin |
-| `.env.embedded` | backend startup build | empty → same-origin |
+In development `vite.config.ts` forwards `/api` to the backend for both `server` and `preview` (target `AWS_OPENCONSOLE_API`, default `http://localhost:4567`), so dev and preview are same-origin as well — **no CORS entry is needed**. The `.env.*` mode files therefore carry only branding, not an API URL.
 
 **There is no frontend test runner configured.** After frontend changes, run `npm run build` — it typechecks the whole project (`tsc -b` with `noUnusedLocals`), so an unused import/var breaks the build.
 
@@ -80,7 +76,7 @@ Errors: `run_query` raises `ProxyExecutionError(ProxyError(code, message), statu
 - **State**: React Query for server data; Zustand (with `persist`) for client state — `authStore`, `sessionStore` (region/profile/endpoint), `logStore` (Inspector), `cliStore`, `themeStore`. Signed-in history syncs to the backend via `store/historySync.ts`; guest history stays in localStorage.
 - **UI is shadcn/ui** (`src/components/ui/*`). Toasts are Sonner; failed queries/toasts auto-fire via the QueryClient caches in `main.tsx` (opt out with `meta: { silent: true }`). **Errors must go through `toastError()` in `src/lib/toast.tsx`** (not `toast.error`) — it attaches a copy button so the message can be pasted elsewhere, and holds for 8s instead of Sonner's 4s. Success/info toasts keep using `toast.*` directly; so do the `'Clipboard is unavailable in this browser'` notices, since a copy button there would fail too. Destructive actions use `components/ConfirmDialog.tsx`, **never** `window.confirm`.
 - **Responsive layout**. The shell (`pages/AppLayout.tsx`) is a flex row: `components/Sidebar.tsx` is `hidden lg:flex`, and below `lg` a hamburger in `components/TopBar.tsx` opens `components/MobileNav.tsx` (a Sheet wrapping the same `SidebarNav`). Both read `useParams` themselves — pass only `collapsed` and an optional `onNavigate` (the drawer closes on it). Never add a fixed width that can't shrink: bound long labels with `max-w-… truncate` (see the endpoint button in `BottomDock.tsx`) and give SVG charts `min-w-0`. **Responsive grids need an explicit base column** — write `grid grid-cols-1 gap-4 lg:grid-cols-2`. A bare `grid gap-4 lg:grid-cols-2` uses an implicit `auto` track that sizes to max-content and overflows narrow phones (it silently hid the Overview Services card). `index.css` pins `html/body/#root` to `100dvh` and the dock pads by `env(safe-area-inset-bottom)`.
-- **Insecure origins are supported and easy to break silently.** The app is routinely served over plain HTTP on a LAN/Tailscale IP (`http://100.106.225.24:8000`), where `window.isSecureContext` is false: `crypto.randomUUID` and `navigator.clipboard` are both **undefined** there, while `localhost` is treated as trustworthy and hides the breakage. Anything needing an id must go through `lib/uid.ts::uid()` (falls back to `getRandomValues`) and anything copying must go through `lib/clipboard.ts::copyText()` (falls back to `document.execCommand`). Never call `crypto.randomUUID()` or `navigator.clipboard.*` directly. Always verify on a non-localhost host, not just `:8000`.
+- **Insecure origins are supported and easy to break silently.** The app is routinely served over plain HTTP on a LAN/Tailscale IP (`http://100.106.225.24:4567`), where `window.isSecureContext` is false: `crypto.randomUUID` and `navigator.clipboard` are both **undefined** there, while `localhost` is treated as trustworthy and hides the breakage. Anything needing an id must go through `lib/uid.ts::uid()` (falls back to `getRandomValues`) and anything copying must go through `lib/clipboard.ts::copyText()` (falls back to `document.execCommand`). Never call `crypto.randomUUID()` or `navigator.clipboard.*` directly. Always verify on a non-localhost host, not just `:4567`.
 - **Styling**: Tailwind v4 via `@tailwindcss/vite`; class-based dark mode (`.dark` on `<html>`) plus `data-theme` accent, from `store/themeStore.ts`. The `brand` palette and `canvas` are in `src/index.css` `@theme` — only shades 50–900 exist, **no `brand-950`**. Branding text comes from `VITE_BRAND_BADGE`/`VITE_BRAND_NAME` in `frontend/.env`; Vite reads `.env` only at startup, so restart the dev server after changing it.
 
 ## Backend layout

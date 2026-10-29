@@ -11,7 +11,7 @@ AWS OpenConsole — a GUI for managing AWS (an "AWS CLI GUI"). A Vite/React/Type
 Python package (managed with **uv**, Python 3.13, run from the repo root):
 ```bash
 uv sync                                       # install deps
-uv run aws-openconsole --reload               # http://127.0.0.1:8000 — API + compiled UI, runs migrations on startup
+uv run aws-openconsole --reload               # http://127.0.0.1:4567 — API + compiled UI, runs migrations on startup
 uv run aws-openconsole --host 0.0.0.0         # expose on the LAN / tailnet
 uv run pytest                                 # full test suite
 uv run pytest tests/test_cli.py         # a single test file

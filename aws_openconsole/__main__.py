@@ -1,6 +1,6 @@
 """``aws-openconsole`` — start the AWS OpenConsole server.
 
-    $ aws-openconsole                       # http://127.0.0.1:8000
+    $ aws-openconsole                       # http://127.0.0.1:4567
     $ aws-openconsole --host 0.0.0.0        # reachable from your LAN / tailnet
 
 One command, one port: the API and the compiled UI are served together, and
@@ -51,7 +51,12 @@ def main(argv: list[str] | None = None) -> None:
         help="Interface to bind. Default: localhost only — use 0.0.0.0 to "
         "expose it on your LAN or tailnet (the UI has no login screen of its own).",
     )
-    parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default: 8000).")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=4567,
+        help="Port to listen on (default: 4567).",
+    )
     parser.add_argument("--reload", action="store_true", help="Restart on source changes (development).")
     parser.add_argument(
         "--no-migrate",

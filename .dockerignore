@@ -1,0 +1,25 @@
+# Secrets and local state must never enter the image — set JWT_SECRET and
+# ENCRYPTION_KEY at runtime instead (docker-compose.yml shows how).
+.env
+.env.*
+dev.db
+data/
+
+# Host environments: copying these in would bake host-specific paths into
+# the image and multiply its size.
+.venv/
+frontend/node_modules/
+**/__pycache__/
+*.py[cod]
+
+# Build output of its own.
+dist/
+build/
+*.egg-info/
+
+# VCS and tooling caches.
+.git/
+.github/
+.pytest_cache/
+.ruff_cache/
+.opencode/
