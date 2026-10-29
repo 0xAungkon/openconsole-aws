@@ -1,116 +1,125 @@
 # AWS OpenConsole
 
+### AWS for Homosapiens
+
 ![AWS OpenConsole overview](Assets/overview.png)
 
-A GUI for managing AWS services — an "AWS CLI GUI". Pick a service (EC2, S3,
-Lambda, IAM, RDS…), fill in an action form, and see results as a table plus a
-raw-JSON inspector. Switch regions and profiles, and point at a local
-Floci/LocalStack endpoint instead of real AWS.
+Skip the command line. OpenConsole is a graphical console for the AWS services
+you use every day — spin up servers, manage files, deploy functions and control
+access, all from your browser.
 
-## Architecture
+---
 
-The frontend never calls AWS directly. In **both** modes it sends a *raw AWS
-query* — `{ service, operation, region, params, endpoint_url?, credentials? }` —
-to the FastAPI backend, which executes it with **boto3** and returns the result.
-This sidesteps browser CORS and keeps the backend service-agnostic: adding a new
-service/action is a change to the frontend catalog (`frontend/src/services/catalog.ts`),
-not new backend code.
+## Features
 
-```
-Guest mode:    Browser (creds in localStorage) ──query + inline creds──▶ FastAPI ──boto3──▶ AWS/Floci
-Register mode: Browser (JWT + profile_id) ──────query──────▶ FastAPI ──decrypt creds──▶ boto3 ──▶ AWS/Floci
-```
+### Six services, fully browsable
 
-- **Guest mode** — no account. Credentials live in the browser and are sent per
-  request; the backend uses them transiently and never persists or logs them.
-- **Register mode** — create an account, store AWS profiles that are **encrypted
-  at rest** (Fernet) and resolved server-side via a JWT + profile id.
+| Service | What you can do |
+| --- | --- |
+| **Compute** (EC2) | Launch, start, stop and terminate instances. From an instance's page: rename, resize, edit firewall rules, manage tags and volumes, take backups. |
+| **Storage** (S3) | Browse buckets and folders, upload, download and move files. Versioning, encryption and static website hosting included. |
+| **Functions** (Lambda) | Write functions as inline code, deploy updates, attach triggers and manage function URLs. |
+| **Access** (IAM) | Manage users, roles, groups and policies, with dependency-aware deletes that clean up what depends on something. |
+| **Databases** (RDS) | List, start and stop database instances. |
+| **NoSQL** (DynamoDB) | Browse tables and items, manage GSIs, TTL and streams. |
 
-## Inspector and terminal history
+### Built for real work
 
-Guest Inspector logs, terminal output, and command history stay in browser
-localStorage. Signed-in history is stored per account in SQLite and restored
-on login, including in another browser. Open sessions refresh every 10 seconds
-and when the window regains focus. Guest history is never uploaded to an account.
+- **Guest mode** — no sign-up. Paste credentials and go. They stay in your
+  browser and are never stored on the server.
+- **Register mode** — create an account and save connection profiles. AWS
+  secrets are encrypted at rest and are never sent back to your browser.
+- **In-app terminal** — a real `aws` CLI that shares your region and
+  credentials with the GUI.
+- **Inspector** — every call is logged with the raw JSON response *and* the
+  exact CLI command to reproduce it.
+- **LocalStack ready** — point the endpoint at a local AWS emulator and build
+  against free fake AWS.
+- **History** — signed-in sessions sync your activity across devices; guests
+  keep it in the browser.
+- **Dark mode**, and a layout that works on phone and desktop.
 
-History retains the latest 200 Inspector entries, 500 terminal lines, and 200
-commands. Clearing the terminal removes output but keeps command recall;
-clearing the Inspector removes its entries. For signed-in users, clears apply
-to the account across browsers. Logout waits for pending history saves; storage
-failures are shown in the panels and retried while the page remains open.
-Run `uv run alembic upgrade head` in `backend/` when upgrading an existing install.
-
-## Layout
-
-- `backend/` — FastAPI app (`app/routes`, `app/models`, `app/schemas`,
-  `app/services`, `app/utils`), SQLAlchemy + Alembic, managed with **uv**.
-- `frontend/` — Vite + React + TypeScript, Tailwind CSS, React Query, Zustand,
-  React Router. 1Panel-style dashboard shell.
+---
 
 ## Prerequisites
 
-- Python 3.13 + [uv](https://docs.astral.sh/uv/)
-- Node 20+
-- (Optional) Docker, for a local AWS via LocalStack
+| Requirement | Version |
+| --- | --- |
+| [Node.js](https://nodejs.org/) | 20.19 or newer |
+| [Python](https://www.python.org/) | 3.13 or newer |
+| [uv](https://docs.astral.sh/uv/) | latest (installs and runs the backend) |
+| AWS account | access keys — *or* skip it with LocalStack, below |
 
-## Backend
+---
 
-```bash
-cd backend
-cp .env.example .env        # then fill in JWT_SECRET and ENCRYPTION_KEY
-# generate secrets:
-#   python -c "import secrets; print(secrets.token_urlsafe(48))"        # JWT_SECRET
-#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # ENCRYPTION_KEY
+## Tech stack
 
-uv sync                     # install deps
-uv run alembic upgrade head # create the SQLite schema
-uv run uvicorn app.main:app --reload   # serves on http://localhost:8000
-uv run pytest               # run the test suite
-```
+**Frontend** — React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui,
+React Query, Zustand.
 
-## Frontend
+**Backend** — FastAPI, boto3 (and the real `aws` CLI for the terminal),
+SQLAlchemy + Alembic on SQLite. Auth is JWT sessions with bcrypt password
+hashing; stored AWS secrets are encrypted with Fernet.
+
+Your browser never talks to AWS. It sends each query to the backend, which
+signs and executes it — so there's no browser CORS problem, and in register
+mode your credentials stay server-side.
+
+---
+
+## Common commands
+
+### Frontend
 
 ```bash
 cd frontend
 npm install
-npm run dev                 # serves on http://localhost:5173 (proxies /api -> :8000)
-npm run build               # typecheck and production build
-node tests/run-history.mjs  # history persistence and session isolation checks
+npm run dev        # http://localhost:5173 (hot reload)
+npm run build      # typecheck + production build
+npm run preview    # serve the built bundle on http://localhost:4173
 ```
 
-Open http://localhost:5173.
-
-## Try it against LocalStack (no real AWS needed)
+### Backend
 
 ```bash
-docker run -d --name floci -p 4566:4566 localstack/localstack:3.0
+cd backend
+cp .env.example .env     # then set JWT_SECRET and ENCRYPTION_KEY
+uv sync                  # install dependencies
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
 ```
 
-Then in the app:
+The backend runs on **http://localhost:8000** and *also serves the built
+frontend at `/`* — so that one URL gives you the whole app on a single port.
 
-1. Choose **Guest mode**.
-2. Endpoint URL: `http://localhost:4566`, access key / secret: `test` / `test`,
-   region `us-east-1`.
-3. Go to **S3** → *Create bucket* (name it `demo-bucket`) → *List buckets*.
-4. Switch the region in the top bar; try **EC2 → List instances**.
-5. Trigger an error (e.g. *Delete bucket* on a missing name) — the AWS error
-   code and message are shown.
+To run the frontend separately during development, use `npm run dev` above;
+it talks to `:8000` automatically.
 
-For **Register mode**, sign up, add a profile under **Profiles** (you can set the
-same LocalStack endpoint per profile), select it in the top bar, and run the same
-queries — now proxied with server-side stored credentials.
+### Tests
 
-## Security notes
+```bash
+cd backend
+uv run pytest
+```
 
-- Guest credentials are stored only in the browser and are never persisted or
-  logged by the backend.
-- Stored profiles encrypt secret material at rest with Fernet; secrets are never
-  returned by the API.
-- Register-mode auth uses JWT access tokens; passwords are bcrypt-hashed.
-- CORS is restricted to the configured frontend origin(s).
+### Try it without an AWS account
 
-## Extending
+Run [LocalStack](https://localstack.cloud/) locally, then choose **Guest**
+mode with endpoint `http://localhost:4566` and the dummy credentials
+`test` / `test`.
 
-Add a service or action by editing `frontend/src/services/catalog.ts`. Each list
-action provides a `getRows` transform and `columns`; mutations declare their form
-`fields`. The backend needs no changes — it dispatches any valid boto3 operation.
+```bash
+docker run -d --name localstack -p 4566:4566 localstack/localstack:3.0
+```
+
+---
+
+## License
+
+Released under the [Creative Commons Attribution-NonCommercial 4.0](LICENSE)
+International license.
+
+You are free to use, modify and share this for **personal, non-commercial**
+purposes. Commercial use is **not** permitted without permission.
+
+Copyright © 2026 [0xAungkon](https://github.com/0xAungkon).
