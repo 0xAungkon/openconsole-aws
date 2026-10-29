@@ -71,6 +71,7 @@ import {
   parseListing,
   type ObjectEntry,
 } from '../lib/s3'
+import { toastError } from '../lib/toast'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
@@ -179,7 +180,7 @@ export function BucketPage() {
       let done = 0
       for (const file of files) {
         if (file.size > MAX_UPLOAD_BYTES) {
-          toast.error(`“${file.name}” is larger than ${formatBytes(MAX_UPLOAD_BYTES)} and was skipped`)
+          toastError(`“${file.name}” is larger than ${formatBytes(MAX_UPLOAD_BYTES)} and was skipped`)
           continue
         }
         toast.loading(`Uploading ${file.name} (${done + 1}/${files.length})…`, { id })
@@ -481,7 +482,7 @@ export function BucketPage() {
             </div>
           </Card>
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <VersioningCard bucket={bucket} />
             <PublicAccessCard bucket={bucket} />
             <EncryptionCard bucket={bucket} />

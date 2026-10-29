@@ -2,10 +2,10 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@ta
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import { toast } from 'sonner'
 import App from './App.tsx'
 import './index.css'
 import { errorMessage } from './lib/errors'
+import { toastError } from './lib/toast'
 import { startHistorySync } from './store/historySync'
 import { startThemeSync } from './store/themeStore'
 
@@ -22,14 +22,14 @@ const queryClient = new QueryClient({
     onError: (error, query) => {
       if (query.meta?.silent) return
       const message = errorMessage(error)
-      toast.error(message, { id: `query:${message}` })
+      toastError(message, { id: `query:${message}` })
     },
   }),
   mutationCache: new MutationCache({
     onError: (error, _variables, _context, mutation) => {
       if (mutation.meta?.silent) return
       const message = errorMessage(error)
-      toast.error(message, { id: `mutation:${message}` })
+      toastError(message, { id: `mutation:${message}` })
     },
   }),
 })

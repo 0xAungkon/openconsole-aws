@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { login, register } from '../api/auth'
 import { errorMessage } from '../lib/errors'
+import { toastError } from '../lib/toast'
 import { BrandLogo } from '../components/BrandLogo'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { ErrorAlert } from '../components/ErrorAlert'
@@ -46,7 +47,7 @@ export function AuthPage({ initialTab = 'login' }: { initialTab?: Tab }) {
     } catch (err) {
       // Inline alert stays by the form; the toast draws attention to it.
       setError(err)
-      toast.error(errorMessage(err), { id: 'auth-error' })
+      toastError(errorMessage(err), { id: 'auth-error' })
     } finally {
       setBusy(false)
     }

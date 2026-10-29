@@ -77,11 +77,13 @@ export function Overview() {
   const unit = (q: { data?: number; isError: boolean }, noun: string) =>
     enabled && !q.isError && q.data != null ? noun : undefined
 
+  // grid-cols-1 pins the track to minmax(0,1fr): an implicit `auto` track sizes
+  // to max-content and can overflow a narrow phone.
   return (
-    <div className="grid gap-4 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
       <div className="flex flex-col gap-4 xl:col-span-2">
         <Card title="Account summary">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
             <StatCounter label="Compute" value={val(instances)} detail={computeDetail} onClick={() => navigate(`/${profile}/compute`)} />
             <StatCounter label="Storage" value={val(buckets)} detail={unit(buckets, 'buckets')} onClick={() => navigate(`/${profile}/storage`)} />
             <StatCounter label="Functions" value={val(functions)} detail={unit(functions, 'functions')} onClick={() => navigate(`/${profile}/functions`)} />

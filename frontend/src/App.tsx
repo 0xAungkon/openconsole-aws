@@ -39,7 +39,15 @@ function RequireAuth({ children }: { children: ReactNode }) {
 export default function App() {
   return (
     <TooltipProvider delayDuration={300}>
-    <Toaster position="bottom-right" offset={{ bottom: 48, right: 16 }} closeButton richColors />
+    {/* On phones sonner forces a full-width stack, so `mobileOffset` (not
+        `offset`) is what keeps toasts above the bottom dock. */}
+    <Toaster
+      position="bottom-right"
+      offset={{ bottom: 48, right: 16 }}
+      mobileOffset={{ bottom: 48, left: 12, right: 12 }}
+      closeButton
+      richColors
+    />
     <Routes>
       <Route path="/" element={<ModeChooser />} />
       <Route path="/login" element={<AuthPage initialTab="login" />} />

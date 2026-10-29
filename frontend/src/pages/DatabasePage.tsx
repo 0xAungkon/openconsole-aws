@@ -26,6 +26,7 @@ import { DbStatusBadge } from '../components/DbStatusBadge'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { timeAgo } from '../lib/ec2'
 import { DB_BUSY, DB_CLASSES, connectionSnippets, engineLabel, generatePassword, toDbRow, validateDbIdentifier, type DbRow } from '../lib/rds'
+import { toastError } from '../lib/toast'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
@@ -81,7 +82,7 @@ export function DatabasePage() {
       ) : query.isError ? (
         <ErrorAlert error={query.error} />
       ) : query.isLoading ? (
-        <div className="flex flex-col gap-4"><Skeleton className="h-24 w-full" /><div className="grid gap-4 lg:grid-cols-2"><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div></div>
+        <div className="flex flex-col gap-4"><Skeleton className="h-24 w-full" /><div className="grid grid-cols-1 gap-4 lg:grid-cols-2"><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div></div>
       ) : !db ? (
         <Card title="Database not found"><p className="text-sm text-muted-foreground">This database no longer exists in {region}.</p></Card>
       ) : (
@@ -326,7 +327,7 @@ function ConfigCard({ db }: { db: DbRow }) {
             <Button type="button" variant="outline" size="icon" onClick={() => setPassword(generatePassword())} aria-label="Generate a new password"><RefreshCw /></Button>
           </div>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <ToggleRow id="cfg-public" label="Publicly accessible" hint="Public IP for connections from outside the VPC." checked={isPublic} onChange={setIsPublic} />
           <ToggleRow id="cfg-multiaz" label="Multi-AZ standby" hint="Synchronous replica in another zone for failover." checked={multiAz} onChange={setMultiAz} />
           <ToggleRow id="cfg-protect" label="Deletion protection" hint="Blocks deleting the instance until turned off." checked={protect} onChange={setProtect} />
@@ -378,7 +379,7 @@ function NameEditor({ db, onRenamed }: { db: DbRow; onRenamed: (next: string) =>
     }
     const problem = validateDbIdentifier(next)
     if (problem) {
-      toast.error(problem)
+      toastError(problem)
       setName(db.Id)
       return
     }

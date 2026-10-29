@@ -1,3 +1,5 @@
+import { uid } from '../lib/uid'
+
 export type HistoryKind = 'inspector' | 'terminal' | 'commands'
 export interface HistoryChange {
   kind: HistoryKind
@@ -6,7 +8,7 @@ export interface HistoryChange {
 let listener: (change: HistoryChange) => void = () => {}
 export function onHistoryChange(handler: typeof listener) { listener = handler }
 export function appendHistory(kind: HistoryKind, payloads: object[]) {
-  listener({ kind, entries: payloads.map((payload) => ({ id: crypto.randomUUID(), payload })) })
+  listener({ kind, entries: payloads.map((payload) => ({ id: uid(), payload })) })
 }
 export function clearHistory(kind: HistoryKind) { listener({ kind }) }
 

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { create } from 'zustand'
+import { API_BASE_URL } from '../api/baseUrl'
 import { useAuthStore } from './authStore'
 import { useCliStore, WELCOME_LINE, type CliLine } from './cliStore'
 import { useLogStore, type LogEntry } from './logStore'
@@ -20,7 +21,7 @@ interface Account {
 export const useHistorySync = create<{ status: string }>(() => ({ status: '' }))
 const guestKey = 'aws-openconsole-guest-history'
 // A dedicated client pins each request to its originating account, even after logout.
-let client = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000', timeout: 15_000 })
+let client = axios.create({ baseURL: API_BASE_URL, timeout: 15_000 })
 let account: Account | null = null
 let started = false
 

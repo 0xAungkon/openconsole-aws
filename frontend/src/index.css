@@ -300,6 +300,17 @@ body,
   height: 100%;
 }
 
+/* Mobile browsers collapse their URL bar, so a plain 100% viewport leaves the
+   bottom dock cut off mid-scroll. Track the dynamic viewport instead — the
+   value is identical to 100% on desktop, and updates live on phones. */
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root {
+    height: 100dvh;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

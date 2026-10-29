@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # CORS: comma-separated list of allowed frontend origins.
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
+    # Embedded frontend. Empty paths resolve to the in-repo defaults
+    # (<repo>/frontend and <repo>/backend/frontend_dist).
+    frontend_src: str = ""
+    frontend_dist: str = ""
+    auto_build_frontend: bool = True
+    frontend_build_timeout: int = 600
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

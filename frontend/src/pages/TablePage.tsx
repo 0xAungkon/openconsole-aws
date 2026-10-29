@@ -49,6 +49,7 @@ import {
 import { timeAgo } from '../lib/ec2'
 import { errorMessage } from '../lib/errors'
 import { formatBytes } from '../lib/s3'
+import { toastError } from '../lib/toast'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
@@ -232,7 +233,7 @@ function ItemsExplorer({ table: t }: { table: DdbTable }) {
   function run() {
     let params: Record<string, unknown> = { TableName: t.Name, Limit: PAGE, ...(index ? { IndexName: index } : {}) }
     if (mode === 'query') {
-      if (!qPk.trim()) return toast.error(`Enter a value for ${indexKeys.pk.name}`)
+      if (!qPk.trim()) return toastError(`Enter a value for ${indexKeys.pk.name}`)
       params = { ...params, ...buildKeyCondition(indexKeys.pk, qPk, indexKeys.sk, qSkOp, qSk, qSk2) }
     } else if (fAttr.trim() && (FILTER_OPS.find((o) => o.id === fOp)?.needsValue ? fVal !== '' : true)) {
       params = { ...params, ...buildFilter(fAttr.trim(), fOp, fVal, fType) }

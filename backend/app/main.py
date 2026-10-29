@@ -6,8 +6,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.errors import register_exception_handlers
 from app.routes import auth, cli, credentials, history, proxy
+from app.services.frontend import build_frontend, register_frontend
 
 logger = logging.getLogger(__name__)
+
+# The app configures no logging, so uvicorn leaves the root logger at WARNING and
+# `logger.info(...)` is invisible — yet the frontend build takes seconds and must
+# be seen. Give the `app` package its own INFO handler; third-party loggers
+# (sqlalchemy, httpx, boto3) still inherit WARNING from root and stay quiet.
+_app_log = logging.getLogger("app")
+if not _app_log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    _app_log.addHandler(_handler)
+    _app_log.setLevel(logging.INFO)
+    _app_log.propagate = False
 
 app = FastAPI(title="AWS OpenConsole API", version="0.1.0")
 register_exception_handlers(app)
@@ -38,3 +51,10 @@ app.include_router(history.router)
 @app.get("/api/health", tags=["health"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+# The SPA catch-all must be registered last so it never shadows an API route.
+# Build first: register_frontend() needs the output directory to exist.
+if settings.auto_build_frontend:
+    build_frontend()
+register_frontend(app)

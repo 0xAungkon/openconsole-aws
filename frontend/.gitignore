@@ -4,3 +4,7 @@ dist/
 .env
 .env.*
 !.env.example
+# Mode files carry no secrets (empty VITE_API_URL + branding) and must ship —
+# the backend's startup build and `npm run build` depend on them.
+!.env.production
+!.env.embedded

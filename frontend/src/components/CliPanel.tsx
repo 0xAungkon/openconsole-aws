@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { errorMessage } from '../lib/errors'
+import { toastError } from '../lib/toast'
 import { runCli } from '../api/cli'
 import { useCliStore } from '../store/cliStore'
 import { terminalMarkdown } from '../lib/terminalMarkdown'
@@ -197,7 +198,7 @@ export function CliPanel() {
     } catch (err) {
       const message = errorMessage(err)
       pushOutput({ kind: 'err', text: message })
-      toast.error(message)
+      toastError(message)
     } finally {
       setBusy(false)
     }

@@ -36,10 +36,24 @@ function NavTip({ label, collapsed, children }: { label: string; collapsed: bool
   )
 }
 
-export function Sidebar() {
+/**
+ * The nav list plus the Settings/Log out footer. Rendered inside the desktop
+ * rail and, below `lg`, inside the mobile drawer — so everything it needs
+ * (profile param, navigation) is read here rather than passed down.
+ *
+ * `collapsed` drives the icon-only rail and its tooltips; the drawer always
+ * passes false. `onNavigate` fires after any link is followed, which is how the
+ * drawer knows to close itself.
+ */
+export function SidebarNav({
+  collapsed,
+  onNavigate,
+}: {
+  collapsed: boolean
+  onNavigate?: () => void
+}) {
   const { profile } = useParams()
   const navigate = useNavigate()
-  const { sidebarCollapsed, toggleSidebar } = useSessionStore()
   const [loggingOut, setLoggingOut] = useState(false)
   const reset = useAuthStore((s) => s.reset)
 
@@ -65,37 +79,20 @@ export function Sidebar() {
     setLoggingOut(true)
     if (await flushHistory()) {
       reset()
+      onNavigate?.()
       navigate('/')
     }
     setLoggingOut(false)
   }
 
   return (
-    <aside
-      className={cn(
-        'flex shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground transition-[width]',
-        sidebarCollapsed ? 'w-16' : 'w-56',
-      )}
-    >
-      <div className="flex items-center justify-between px-3 py-4">
-        {!sidebarCollapsed ? <BrandLogo /> : <Hexagon className="h-5 w-5 text-primary" />}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={toggleSidebar}
-          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="text-muted-foreground"
-        >
-          {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-        </Button>
-      </div>
-
+    <>
       <nav className="flex-1 space-y-1 overflow-y-auto px-2">
         {navItems.map((item) => (
-          <NavTip key={item.to} label={item.label} collapsed={sidebarCollapsed}>
-            <NavLink to={item.to} end={item.end} className={linkClass} aria-label={item.label}>
+          <NavTip key={item.to} label={item.label} collapsed={collapsed}>
+            <NavLink to={item.to} end={item.end} className={linkClass} aria-label={item.label} onClick={onNavigate}>
               <item.icon className="h-4 w-4 shrink-0" />
-              {!sidebarCollapsed && (
+              {!collapsed && (
                 <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
                   <span className="truncate">{item.label}</span>
                   {item.code && (
@@ -112,13 +109,13 @@ export function Sidebar() {
 
       <Separator />
       <div className="space-y-1 px-2 py-2">
-        <NavTip label="Settings" collapsed={sidebarCollapsed}>
-          <NavLink to={`${base}/settings`} className={linkClass} aria-label="Settings">
+        <NavTip label="Settings" collapsed={collapsed}>
+          <NavLink to={`${base}/settings`} className={linkClass} aria-label="Settings" onClick={onNavigate}>
             <Settings className="h-4 w-4 shrink-0" />
-            {!sidebarCollapsed && <span>Settings</span>}
+            {!collapsed && <span>Settings</span>}
           </NavLink>
         </NavTip>
-        <NavTip label="Log out" collapsed={sidebarCollapsed}>
+        <NavTip label="Log out" collapsed={collapsed}>
           <button
             type="button"
             onClick={logout}
@@ -127,10 +124,39 @@ export function Sidebar() {
             aria-label="Log out"
           >
             <LogOut className="h-4 w-4 shrink-0" />
-            {!sidebarCollapsed && <span>Log out</span>}
+            {!collapsed && <span>Log out</span>}
           </button>
         </NavTip>
       </div>
+    </>
+  )
+}
+
+/** Desktop-only nav rail. Below `lg` the app swaps this for `MobileNav`. */
+export function Sidebar() {
+  const { sidebarCollapsed, toggleSidebar } = useSessionStore()
+
+  return (
+    <aside
+      className={cn(
+        'hidden shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground transition-[width] lg:flex',
+        sidebarCollapsed ? 'w-16' : 'w-56',
+      )}
+    >
+      <div className="flex items-center justify-between px-3 py-4">
+        {!sidebarCollapsed ? <BrandLogo /> : <Hexagon className="h-5 w-5 text-primary" />}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={toggleSidebar}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="text-muted-foreground"
+        >
+          {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+        </Button>
+      </div>
+
+      <SidebarNav collapsed={sidebarCollapsed} />
     </aside>
   )
 }

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Check, Plus, User } from 'lucide-react'
+import { Check, Menu, Plus, User } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -25,7 +25,7 @@ import { useAuthStore } from '../store/authStore'
 import { ThemeToggle } from './ThemeToggle'
 import { AWS_REGIONS, useSessionStore } from '../store/sessionStore'
 
-export function TopBar({ title }: { title: string }) {
+export function TopBar({ title, onMenu }: { title: string; onMenu?: () => void }) {
   const navigate = useNavigate()
   const { profile: profileParam } = useParams()
   const { mode, user } = useAuthStore()
@@ -39,12 +39,25 @@ export function TopBar({ title }: { title: string }) {
   const profiles = profilesQuery.data ?? []
 
   return (
-    <header className="flex items-center justify-between border-b bg-card px-4 py-2">
-      <h1 className="text-sm font-medium">{title}</h1>
+    <header className="flex items-center justify-between gap-2 border-b bg-card px-3 py-2 sm:px-4">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        {onMenu && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onMenu}
+            aria-label="Open navigation"
+            className="shrink-0 text-muted-foreground lg:hidden"
+          >
+            <Menu />
+          </Button>
+        )}
+        <h1 className="truncate text-sm font-medium">{title}</h1>
+      </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <Select value={region} onValueChange={setRegion}>
-          <SelectTrigger size="sm" aria-label="Region" className="w-40 text-xs">
+          <SelectTrigger size="sm" aria-label="Region" className="w-32 text-xs sm:w-40">
             <SelectValue placeholder="Region" />
           </SelectTrigger>
           <SelectContent>
@@ -57,7 +70,7 @@ export function TopBar({ title }: { title: string }) {
         </Select>
 
         {mode === 'guest' && (
-          <Badge className="border-transparent bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+          <Badge className="hidden border-transparent bg-amber-100 text-amber-700 sm:inline-flex dark:bg-amber-950/50 dark:text-amber-300">
             Guest Mode
           </Badge>
         )}

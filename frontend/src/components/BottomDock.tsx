@@ -95,8 +95,8 @@ export function BottomDock() {
         </div>
       )}
 
-      {/* bar */}
-      <div className="flex h-8 items-center justify-between border-t bg-card">
+      {/* bar — the extra bottom padding keeps it clear of the iOS home indicator */}
+      <div className="flex min-h-8 items-center justify-between border-t bg-card pb-[env(safe-area-inset-bottom)]">
         <div className="flex h-full items-stretch">
           <Button variant="ghost" onClick={() => toggle('cli')} className={tab(panel === 'cli')} aria-pressed={panel === 'cli'}>
             <TerminalSquare className="size-3.5" />
@@ -117,11 +117,15 @@ export function BottomDock() {
           variant="ghost"
           size="sm"
           onClick={() => setEndpointOpen(true)}
-          className="h-full rounded-none px-3 text-xs font-normal text-muted-foreground hover:text-primary"
-          title="Configure endpoint"
+          className="h-full min-w-0 rounded-none px-2 text-xs font-normal text-muted-foreground hover:text-primary sm:px-3"
+          title={effectiveEndpoint || 'AWS default endpoint'}
         >
-          <span className={cn('h-2 w-2 rounded-full', effectiveEndpoint ? 'bg-amber-500' : 'bg-green-500')} />
-          {effectiveEndpoint || 'AWS default endpoint'}
+          <span className={cn('h-2 w-2 shrink-0 rounded-full', effectiveEndpoint ? 'bg-amber-500' : 'bg-green-500')} />
+          {/* Cap the label so a long LocalStack URL ellipsizes instead of
+              shoving the CLI/Inspector tabs off a narrow screen. */}
+          <span className="max-w-[42vw] truncate sm:max-w-[320px]">
+            {effectiveEndpoint || 'AWS default endpoint'}
+          </span>
         </Button>
       </div>
 

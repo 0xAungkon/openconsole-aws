@@ -45,7 +45,7 @@ export function SettingsPage() {
 
   if (mode === 'guest') {
     return (
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Settings">
           <p className="text-sm text-muted-foreground">
             You're in guest mode. Credentials are stored only in this browser. Use
@@ -59,7 +59,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <ThemeSettingsCard />
       <Card title="Stored AWS profiles">
         {profiles.isLoading ? (

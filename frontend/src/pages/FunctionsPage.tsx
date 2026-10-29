@@ -38,6 +38,7 @@ import { timeAgo } from '../lib/ec2'
 import { RUNTIMES, flattenFunctions, runtimeLabel, validateFunctionName, zipSourceBase64, type FunctionRow } from '../lib/lambda'
 import { bytesParam, fileToBase64, formatBytes } from '../lib/s3'
 import { prettyJson } from '../lib/lambda'
+import { toastError } from '../lib/toast'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 
@@ -104,7 +105,7 @@ export function FunctionsPage() {
     },
     onSuccess: (r) => {
       const body = prettyJson(r.Payload ?? '').slice(0, 300)
-      if (r.FunctionError) toast.error(`${r.name} returned ${r.FunctionError}`, { description: body })
+      if (r.FunctionError) toastError(`${r.name} returned ${r.FunctionError}`, { description: body })
       else toast.success(`${r.name} invoked (HTTP ${r.StatusCode})`, { description: body })
     },
   })

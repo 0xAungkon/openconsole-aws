@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useParams } from 'react-router-dom'
 import { listProfiles } from '../api/auth'
 import { BottomDock } from '../components/BottomDock'
+import { MobileNav } from '../components/MobileNav'
 import { Sidebar } from '../components/Sidebar'
 import { TopBar } from '../components/TopBar'
 import { getServiceByRoute } from '../services/catalog'
@@ -26,6 +27,8 @@ export function AppLayout() {
   const guestCreds = useAuthStore((s) => s.guestCreds)
   const setActiveProfileId = useSessionStore((s) => s.setActiveProfileId)
   const setRegion = useSessionStore((s) => s.setRegion)
+  // Mobile only: the slide-in nav drawer, driven by the TopBar hamburger.
+  const [navOpen, setNavOpen] = useState(false)
 
   const profilesQuery = useQuery({
     queryKey: ['profiles'],
@@ -69,7 +72,7 @@ export function AppLayout() {
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar title={titleFor(location.pathname)} />
+        <TopBar title={titleFor(location.pathname)} onMenu={() => setNavOpen(true)} />
 
         <main className={`flex-1 overflow-y-auto p-4 ${['compute', 'storage', 'functions', 'databases', 'nosql', 'access'].includes(location.pathname.split('/').filter(Boolean)[1] ?? '') ? 'bg-card sm:p-6' : ''}`}>
           <Outlet />
@@ -77,6 +80,8 @@ export function AppLayout() {
 
         <BottomDock />
       </div>
+
+      <MobileNav open={navOpen} onOpenChange={setNavOpen} />
     </div>
   )
 }

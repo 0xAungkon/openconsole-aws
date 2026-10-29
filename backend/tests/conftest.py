@@ -11,6 +11,9 @@ os.environ.setdefault(
     "FA5G2fRYX4nC13T83COEObUe28MBkJ9mkjqfrHzYK7o=",
 )
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
+# Never run the npm frontend build from the test suite — it would shell out to
+# node and take tens of seconds per run.
+os.environ.setdefault("AUTO_BUILD_FRONTEND", "false")
 
 
 @pytest.fixture

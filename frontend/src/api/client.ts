@@ -1,12 +1,12 @@
 import axios from 'axios'
-import { toast } from 'sonner'
+import { toastError } from '../lib/toast'
 import { useAuthStore } from '../store/authStore'
+import { API_BASE_URL } from './baseUrl'
 
-// Backend base URL comes from the environment (VITE_API_URL). Requests are made
-// cross-origin directly to FastAPI; the backend allows this origin via CORS.
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
-})
+// Backend base URL comes from VITE_API_URL (see ./baseUrl.ts). In dev/preview it
+// is cross-origin and FastAPI allows that origin via CORS; in the embedded build
+// served by FastAPI itself it is empty, so requests stay same-origin.
+export const api = axios.create({ baseURL: API_BASE_URL })
 
 // Attach the JWT for register-mode requests.
 api.interceptors.request.use((config) => {
@@ -32,7 +32,7 @@ api.interceptors.response.use(
       const { mode, token, reset } = useAuthStore.getState()
       if (mode === 'register' && token) {
         reset()
-        toast.error('Your session has expired — please sign in again.', { id: 'session-expired' })
+        toastError('Your session has expired — please sign in again.', { id: 'session-expired' })
         if (window.location.pathname !== '/') window.location.assign('/')
       }
     }

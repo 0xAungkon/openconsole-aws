@@ -43,6 +43,7 @@ import { timeAgo } from '../lib/ec2'
 import { errorMessage } from '../lib/errors'
 import { RUNTIMES, decodeBase64, prettyJson, runtimeLabel, toRow, zipSourceBase64, type FunctionRow } from '../lib/lambda'
 import { bytesParam, fileToBase64, formatBytes } from '../lib/s3'
+import { toastError } from '../lib/toast'
 import { useAuthStore } from '../store/authStore'
 import { useSessionStore } from '../store/sessionStore'
 import { StateBadgeLambda } from './FunctionsPage'
@@ -113,7 +114,7 @@ export function FunctionPage() {
       ) : query.isLoading || !fn ? (
         <div className="flex flex-col gap-4">
           <Skeleton className="h-24 w-full" />
-          <div className="grid gap-4 lg:grid-cols-2"><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2"><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div>
         </div>
       ) : (
         <>
@@ -243,7 +244,7 @@ function InvokeCard({ name }: { name: string }) {
     },
     onSuccess: (r) => {
       setResult(r)
-      if (r.error) toast.error(`Function returned an error (${r.error})`)
+      if (r.error) toastError(`Function returned an error (${r.error})`)
       else toast.success(`Invoked ${name} in ${r.ms} ms`)
     },
   })
