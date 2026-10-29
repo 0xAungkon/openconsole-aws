@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aws-openconsole"
+version = "0.1.0"
+description = "AWS for Homosapiens — a graphical console for your AWS account"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "0xAungkon", email = "aungkonmalakar@gmail.com" }]
+requires-python = ">=3.13"
+keywords = ["aws", "cloud", "console", "gui", "boto3", "fastapi", "ec2", "s3"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "alembic>=1.19.2",
+    "awscli>=1.46.1",
+    "bcrypt>=5.0.0",
+    "boto3>=1.43.89",
+    "cryptography>=50.0.1",
+    "fastapi>=0.141.1",
+    "pydantic-settings>=2.15.0",
+    "pydantic[email]>=2.13.5",
+    "python-jose[cryptography]>=3.5.0",
+    "python-multipart>=0.0.32",
+    "sqlalchemy>=2.0.52",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/0xAungkon/openconsole-aws"
+Repository = "https://github.com/0xAungkon/openconsole-aws"
+Issues = "https://github.com/0xAungkon/openconsole-aws/issues"
+
+[project.scripts]
+aws-openconsole = "aws_openconsole.__main__:main"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.12.0",
+    "moto>=5.2.3",
+    "pytest>=9.1.1",
+]
+
+# Ship the whole package: the Python code, the Alembic migrations and
+# alembic.ini, and the compiled UI in frontend_dist/ (so an installed instance
+# needs no Node toolchain).
+[tool.hatch.build.targets.wheel]
+packages = ["aws_openconsole"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "aws_openconsole",
+    "frontend",
+    "README.md",
+    "LICENSE",
+    ".env.example",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

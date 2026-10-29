@@ -43,12 +43,11 @@ access, all from your browser.
 
 ## Prerequisites
 
-| Requirement | Version |
+| To… | You need |
 | --- | --- |
-| [Node.js](https://nodejs.org/) | 20.19 or newer |
-| [Python](https://www.python.org/) | 3.13 or newer |
-| [uv](https://docs.astral.sh/uv/) | latest (installs and runs the backend) |
-| AWS account | access keys — *or* skip it with LocalStack, below |
+| **Run it** | [uv](https://docs.astral.sh/uv/) — that's all. It installs Python for you if needed, and the UI ships compiled. |
+| **Develop it** | Node.js 20.19+ (frontend dev server & rebuilding the UI), Python 3.13+, git |
+| **Connect to AWS** | an account with access keys — *or* skip AWS entirely with LocalStack, below |
 
 ---
 
@@ -69,36 +68,51 @@ mode your credentials stay server-side.
 
 ## Common commands
 
-### Frontend
+### Run it — one command, no clone
 
 ```bash
-cd frontend
-npm install
-npm run dev        # http://localhost:5173 (hot reload)
-npm run build      # typecheck + production build
-npm run preview    # serve the built bundle on http://localhost:4173
+uvx --from "git+https://github.com/0xAungkon/openconsole-aws" aws-openconsole
 ```
 
-### Backend
+Then open **http://127.0.0.1:8000**.
+
+That is the entire install: the compiled UI and the database migrations ship
+inside the package, so there is nothing to clone, no `npm install`, and no
+setup commands. The only requirement is [uv](https://docs.astral.sh/uv/).
+
+Options: `--host 0.0.0.0` to reach it from your phone or another machine,
+`--port 9000` to move it off 8000.
+
+Once published to PyPI the command shortens to `uvx aws-openconsole`.
+
+### Configuration (optional)
+
+It runs immediately with built-in defaults, but register mode can't store AWS
+profiles until an encryption key exists. Set it as an environment variable:
 
 ```bash
-cd backend
-cp .env.example .env     # then set JWT_SECRET and ENCRYPTION_KEY
-uv sync                  # install dependencies
-uv run alembic upgrade head
-uv run uvicorn app.main:app --reload
+export JWT_SECRET="$(openssl rand -hex 32)"
+export ENCRYPTION_KEY="$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+uvx --from "git+https://github.com/0xAungkon/openconsole-aws" aws-openconsole
 ```
 
-The backend runs on **http://localhost:8000** and *also serves the built
-frontend at `/`* — so that one URL gives you the whole app on a single port.
+If you did clone the repo, `cp .env.example .env` and edit that instead — the
+app reads `./.env` from the directory you start it in.
 
-To run the frontend separately during development, use `npm run dev` above;
-it talks to `:8000` automatically.
+### Develop
+
+```bash
+uv sync                              # Python dependencies
+uv run aws-openconsole --reload      # API + UI on :8000; rebuilds the UI when sources change
+
+cd frontend && npm install           # only needed for hot-reload UI work
+npm run dev                          # http://localhost:5173, talks to :8000
+npm run build                        # typecheck + rebuild the bundled UI
+```
 
 ### Tests
 
 ```bash
-cd backend
 uv run pytest
 ```
 

@@ -8,16 +8,19 @@ AWS OpenConsole — a GUI for managing AWS (an "AWS CLI GUI"). A Vite/React/Type
 
 ## Commands
 
-Backend (`cd backend`, managed with **uv**, Python 3.13):
+Python package (managed with **uv**, Python 3.13, run from the repo root):
 ```bash
-uv sync                                 # install deps
-uv run alembic upgrade head             # create/upgrade the SQLite schema (dev.db)
-uv run uvicorn app.main:app --reload    # http://localhost:8000 — also builds + serves the frontend at /
-uv run pytest                           # full test suite (25 tests)
+uv sync                                       # install deps
+uv run aws-openconsole --reload               # http://127.0.0.1:8000 — serves the API + compiled UI, runs migrations on startup
+uv run aws-openconsole --host 0.0.0.0         # expose on the LAN / tailnet
+uv run pytest                                 # full test suite (25 tests)
 uv run pytest tests/test_cli.py         # a single test file
 uv run pytest tests/test_cli.py::test_cli_route_rejects_non_aws   # a single test
+uv run alembic upgrade head                   # explicit migration — normally unnecessary, startup already runs it
 uv run alembic revision --autogenerate -m "msg"   # new migration after a model change
 ```
+
+End users run none of this: `uvx --from "git+https://github.com/0xAungkon/openconsole-aws" aws-openconsole` needs no clone and no Node, because the compiled UI and the migrations ship inside the wheel.
 
 Frontend (`cd frontend`, Node 20+, `npm install`):
 ```bash
@@ -27,7 +30,7 @@ npm run preview    # serve the built bundle on http://localhost:4173 (/api proxi
 npm run lint       # oxlint
 ```
 
-**Embedded frontend**: starting the backend compiles `frontend/` into `backend/frontend_dist/` (only if stale) and serves it at `/`, so one process gives the whole app. `app/services/frontend.py` registers a catch-all `GET /{path}` *after* every API route, so API/docs always win and unknown paths return `index.html` for React Router. `AUTO_BUILD_FRONTEND=false` disables the build (tests set this). Because `npm run build` and the backend build share that output dir, both must emit same-origin bundles — see the `.env.*` modes below.
+**Embedded frontend**: the compiled bundle lives in `aws_openconsole/frontend_dist/` and is served at `/`, so one process gives the whole app. That directory is **committed on purpose, not gitignored** — it ships inside the wheel, which is what lets `uvx aws-openconsole` serve a working UI with no Node installed. Deleting or ignoring it breaks every installed copy. When run from a git checkout with `frontend/node_modules` present, `aws_openconsole/services/frontend.py` recompiles it on startup if the sources are newer; when installed from a wheel there is no `frontend/` source, so it logs "serving the bundled UI build" and skips the build. It registers a catch-all `GET /{path}` *after* every API route, so API/docs always win and unknown paths return `index.html` for React Router. `AUTO_BUILD_FRONTEND=false` disables the build (tests set this). Because `npm run build` and the backend build share that output dir, both must emit same-origin bundles — see the `.env.*` modes below.
 
 **Vite env modes** (mode files override `.env`; a real env var overrides everything):
 
@@ -54,13 +57,13 @@ Then use Guest mode with endpoint `http://localhost:4566` and dummy creds `test`
 
 **The frontend never calls AWS or signs requests.** In both auth modes it POSTs a raw query to the backend, which executes it. Two backend execution paths:
 
-1. **`POST /api/proxy`** — generic boto3 dispatcher (`app/services/aws_proxy.py`). Body: `{ service, operation, region, params, endpoint_url?, credentials? | profile_id }`. It does `getattr(boto3.client(service, ...), operation)(**params)` and returns a JSON-safe result (datetimes→ISO, Decimal→float, bytes→text/base64, `ResponseMetadata` stripped). Binary params (e.g. an S3 upload `Body`) are sent as `{"__bytes_base64__": "<b64>"}` and decoded server-side. `POST /api/proxy/lambda-code` is the one special case: it downloads a Lambda deployment package server-side from the presigned `Code.Location` of `get_function` (browsers can't — no CORS), capped at 10 MB. Because it's otherwise fully generic, **adding an AWS service or action requires no backend change** — it's a frontend catalog edit.
+1. **`POST /api/proxy`** — generic boto3 dispatcher (`aws_openconsole/services/aws_proxy.py`). Body: `{ service, operation, region, params, endpoint_url?, credentials? | profile_id }`. It does `getattr(boto3.client(service, ...), operation)(**params)` and returns a JSON-safe result (datetimes→ISO, Decimal→float, bytes→text/base64, `ResponseMetadata` stripped). Binary params (e.g. an S3 upload `Body`) are sent as `{"__bytes_base64__": "<b64>"}` and decoded server-side. `POST /api/proxy/lambda-code` is the one special case: it downloads a Lambda deployment package server-side from the presigned `Code.Location` of `get_function` (browsers can't — no CORS), capped at 10 MB. Because it's otherwise fully generic, **adding an AWS service or action requires no backend change** — it's a frontend catalog edit.
 
-2. **`POST /api/cli`** — runs the real `aws` binary (`app/services/cli_runner.py`) for the in-app terminal. Hard security constraints: the command's first token must be `aws`; it's parsed with `shlex` and run as an argv list **without a shell** (no metacharacter injection); credentials are injected via **environment variables only** (never argv, never logged); `AWS_CONFIG_FILE`/`AWS_SHARED_CREDENTIALS_FILE` are pinned to `os.devnull` so the server's own profiles can't leak in.
+2. **`POST /api/cli`** — runs the real `aws` binary (`aws_openconsole/services/cli_runner.py`) for the in-app terminal. Hard security constraints: the command's first token must be `aws`; it's parsed with `shlex` and run as an argv list **without a shell** (no metacharacter injection); credentials are injected via **environment variables only** (never argv, never logged); `AWS_CONFIG_FILE`/`AWS_SHARED_CREDENTIALS_FILE` are pinned to `os.devnull` so the server's own profiles can't leak in.
 
-Both paths resolve credentials identically via `app/services/request_auth.py::resolve_credentials`:
+Both paths resolve credentials identically via `aws_openconsole/services/request_auth.py::resolve_credentials`:
 - **Guest mode** — inline credentials in the request body. Used transiently to build the client/env; **never persisted or logged**. Stored only in the browser (localStorage).
-- **Register mode** — JWT (`Authorization: Bearer`) + `profile_id`. The stored profile's secrets are **encrypted at rest with Fernet** (`app/utils/crypto.py`), decrypted only in memory, and never returned by the API.
+- **Register mode** — JWT (`Authorization: Bearer`) + `profile_id`. The stored profile's secrets are **encrypted at rest with Fernet** (`aws_openconsole/utils/crypto.py`), decrypted only in memory, and never returned by the API.
 
 ```
 Guest:    Browser (creds in localStorage) ─query + inline creds─▶ /api/proxy|/api/cli ─boto3/aws─▶ AWS/LocalStack
@@ -82,8 +85,8 @@ Errors: `run_query` raises `ProxyExecutionError(ProxyError(code, message), statu
 
 ## Backend layout
 
-`app/routes/` (auth, credentials, proxy, cli, history) → thin HTTP handlers. `app/services/` holds the real logic (`aws_proxy`, `cli_runner`, `request_auth`, `credential_store`, `auth_service`, `history_store`, `frontend`). `app/models/` + Alembic for persistence (SQLite `dev.db` in dev; `users`, `aws_credentials`, plus `history`/`session` tables from `alembic/versions/8fa24b2c1910_add_history.py` — actual table names are `history_entries`/`sessions`). `app/utils/` for `crypto` (Fernet) and `security` (JWT/bcrypt, `current_user` dependency). Config via pydantic-settings from `backend/.env` (`JWT_SECRET`, `ENCRYPTION_KEY`, DB URL, CORS origins, frontend build settings).
+`aws_openconsole/routes/` (auth, credentials, proxy, cli, history) → thin HTTP handlers. `aws_openconsole/services/` holds the real logic (`aws_proxy`, `cli_runner`, `request_auth`, `credential_store`, `auth_service`, `history_store`, `frontend`). `aws_openconsole/models/` + Alembic for persistence (SQLite `dev.db` in dev; `users`, `aws_credentials`, plus `history`/`session` tables from `alembic/versions/8fa24b2c1910_add_history.py` — actual table names are `history_entries`/`sessions`). `aws_openconsole/utils/` for `crypto` (Fernet) and `security` (JWT/bcrypt, `current_user` dependency). Config via pydantic-settings from `.env` (`JWT_SECRET`, `ENCRYPTION_KEY`, DB URL, CORS origins, frontend build settings).
 
-**Logging**: the app configures nothing, so the root logger sits at WARNING and `logger.info(...)` is invisible. `app/main.py` attaches a handler to the `app` logger at INFO (scoped, so `sqlalchemy`/`httpx`/`boto3` stay quiet). Put app logs under `app.*` or they'll be silently dropped.
+**Logging**: the app configures nothing, so the root logger sits at WARNING and `logger.info(...)` is invisible. `aws_openconsole/main.py` attaches a handler to the `aws_openconsole` logger at INFO (scoped, so `sqlalchemy`/`httpx`/`boto3` stay quiet). Put app logs under `aws_openconsole.*` or they'll be silently dropped.
 
-**Tests** (`backend/tests/`, `uv run pytest`): 25 tests across 6 files. `tests/conftest.py` sets `DATABASE_URL`/`JWT_SECRET`/`ENCRYPTION_KEY` env defaults **before** app modules import their cached `settings`, and overrides `get_db` with an in-memory SQLite engine — don't reorder that. Only `tests/test_proxy.py` uses `moto`; the CLI tests exercise **rejection paths only** and never spawn a real `aws` process.
+**Tests** (`tests/`, `uv run pytest`): 25 tests across 6 files. `tests/conftest.py` sets `DATABASE_URL`/`JWT_SECRET`/`ENCRYPTION_KEY` env defaults **before** app modules import their cached `settings`, and overrides `get_db` with an in-memory SQLite engine — don't reorder that. Only `tests/test_proxy.py` uses `moto`; the CLI tests exercise **rejection paths only** and never spawn a real `aws` process.

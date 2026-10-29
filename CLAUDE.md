@@ -8,14 +8,15 @@ AWS OpenConsole — a GUI for managing AWS (an "AWS CLI GUI"). A Vite/React/Type
 
 ## Commands
 
-Backend (`cd backend`, managed with **uv**, Python 3.13):
+Python package (managed with **uv**, Python 3.13, run from the repo root):
 ```bash
-uv sync                                 # install deps
-uv run alembic upgrade head             # create/upgrade the SQLite schema (dev.db)
-uv run uvicorn app.main:app --reload    # http://localhost:8000
-uv run pytest                           # full test suite
+uv sync                                       # install deps
+uv run aws-openconsole --reload               # http://127.0.0.1:8000 — API + compiled UI, runs migrations on startup
+uv run aws-openconsole --host 0.0.0.0         # expose on the LAN / tailnet
+uv run pytest                                 # full test suite
 uv run pytest tests/test_cli.py         # a single test file
 uv run pytest tests/test_cli.py::test_cli_route_rejects_non_aws   # a single test
+uv run alembic upgrade head                   # explicit migration — normally unnecessary, startup already runs it
 uv run alembic revision --autogenerate -m "msg"   # new migration after a model change
 ```
 
@@ -34,13 +35,13 @@ Run against LocalStack (no real AWS): `docker run -d --name floci -p 4566:4566 -
 
 **The frontend never calls AWS or signs requests.** In both auth modes it POSTs a raw query to the backend, which executes it. Two backend execution paths:
 
-1. **`POST /api/proxy`** — generic boto3 dispatcher (`app/services/aws_proxy.py`). Body: `{ service, operation, region, params, endpoint_url?, credentials? | profile_id }`. It does `getattr(boto3.client(service, ...), operation)(**params)` and returns a JSON-safe result (datetimes→ISO, Decimal→float, bytes→text/base64, `ResponseMetadata` stripped). Binary request params (e.g. an S3 upload `Body`) are sent as `{"__bytes_base64__": "<b64>"}` and decoded to `bytes` server-side (`bytesParam()` in `src/lib/s3.ts`). Client-side helpers like `generate_presigned_url` work too (used for S3 downloads). `POST /api/proxy/lambda-code` is the one special case: it downloads a Lambda deployment package server-side from the presigned `Code.Location` that `get_function` returns (browsers can't — no CORS), capped at 10 MB. Because it's otherwise fully generic, **adding an AWS service or action requires no backend change** — it's a frontend catalog edit.
+1. **`POST /api/proxy`** — generic boto3 dispatcher (`aws_openconsole/services/aws_proxy.py`). Body: `{ service, operation, region, params, endpoint_url?, credentials? | profile_id }`. It does `getattr(boto3.client(service, ...), operation)(**params)` and returns a JSON-safe result (datetimes→ISO, Decimal→float, bytes→text/base64, `ResponseMetadata` stripped). Binary request params (e.g. an S3 upload `Body`) are sent as `{"__bytes_base64__": "<b64>"}` and decoded to `bytes` server-side (`bytesParam()` in `src/lib/s3.ts`). Client-side helpers like `generate_presigned_url` work too (used for S3 downloads). `POST /api/proxy/lambda-code` is the one special case: it downloads a Lambda deployment package server-side from the presigned `Code.Location` that `get_function` returns (browsers can't — no CORS), capped at 10 MB. Because it's otherwise fully generic, **adding an AWS service or action requires no backend change** — it's a frontend catalog edit.
 
-2. **`POST /api/cli`** — runs the real `aws` binary (`app/services/cli_runner.py`) for the in-app terminal. Hard security constraints here: the command's first token must be `aws`; it's parsed with `shlex` and run as an argv list **without a shell** (no metacharacter injection); credentials are injected via **environment variables only** (never argv, never logged); `AWS_CONFIG_FILE`/`AWS_SHARED_CREDENTIALS_FILE` are pinned to `os.devnull` so the server's own profiles can't leak in.
+2. **`POST /api/cli`** — runs the real `aws` binary (`aws_openconsole/services/cli_runner.py`) for the in-app terminal. Hard security constraints here: the command's first token must be `aws`; it's parsed with `shlex` and run as an argv list **without a shell** (no metacharacter injection); credentials are injected via **environment variables only** (never argv, never logged); `AWS_CONFIG_FILE`/`AWS_SHARED_CREDENTIALS_FILE` are pinned to `os.devnull` so the server's own profiles can't leak in.
 
-Both paths resolve credentials the same way via `app/services/request_auth.py::resolve_credentials`:
+Both paths resolve credentials the same way via `aws_openconsole/services/request_auth.py::resolve_credentials`:
 - **Guest mode** — inline credentials in the request body. Used transiently to build the client/env; **never persisted or logged**. Stored only in the browser (localStorage).
-- **Register mode** — JWT (`Authorization: Bearer`) + `profile_id`. The stored profile's secrets are **encrypted at rest with Fernet** (`app/utils/crypto.py`), decrypted only in memory, and never returned by the API.
+- **Register mode** — JWT (`Authorization: Bearer`) + `profile_id`. The stored profile's secrets are **encrypted at rest with Fernet** (`aws_openconsole/utils/crypto.py`), decrypted only in memory, and never returned by the API.
 
 ```
 Guest:    Browser (creds in localStorage) ─query + inline creds─▶ /api/proxy|/api/cli ─boto3/aws─▶ AWS/LocalStack
@@ -60,4 +61,4 @@ Errors: `run_query` raises `ProxyExecutionError(ProxyError(code, message), statu
 
 ## Backend layout
 
-`app/routes/` (auth, credentials, proxy, cli) → thin HTTP handlers. `app/services/` holds the real logic (`aws_proxy`, `cli_runner`, `request_auth`, `credential_store`, `auth_service`). `app/models/` + Alembic for persistence (SQLite `dev.db` in dev; `users` + `aws_credentials`). `app/utils/` for `crypto` (Fernet) and `security` (JWT/bcrypt, `current_user` dependency). Config via pydantic-settings from `backend/.env` (`JWT_SECRET`, `ENCRYPTION_KEY`, DB URL, CORS origins). Tests use `moto` to mock AWS and only exercise CLI **rejection** paths (they never spawn a real `aws` process).
+`aws_openconsole/routes/` (auth, credentials, proxy, cli) → thin HTTP handlers. `aws_openconsole/services/` holds the real logic (`aws_proxy`, `cli_runner`, `request_auth`, `credential_store`, `auth_service`). `aws_openconsole/models/` + Alembic for persistence (SQLite `dev.db` in dev; `users` + `aws_credentials`). `aws_openconsole/utils/` for `crypto` (Fernet) and `security` (JWT/bcrypt, `current_user` dependency). Config via pydantic-settings from `.env` (`JWT_SECRET`, `ENCRYPTION_KEY`, DB URL, CORS origins). Tests use `moto` to mock AWS and only exercise CLI **rejection** paths (they never spawn a real `aws` process).

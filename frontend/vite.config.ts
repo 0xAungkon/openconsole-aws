@@ -8,9 +8,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },
   build: {
-    // Land the bundle inside the backend tree so `uvicorn app.main:app` can
-    // serve it at "/". emptyOutDir is required because outDir is outside root.
-    outDir: '../backend/frontend_dist',
+    // Land the bundle inside the package so `aws-openconsole` can serve it at
+    // "/" — it also ships in the wheel, which is why this directory is
+    // committed rather than gitignored.
+    outDir: '../aws_openconsole/frontend_dist',
     emptyOutDir: true,
   },
   server: {
