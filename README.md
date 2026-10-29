@@ -1,5 +1,7 @@
 # AWS OpenConsole
 
+![AWS OpenConsole overview](Assets/overview.png)
+
 A GUI for managing AWS services — an "AWS CLI GUI". Pick a service (EC2, S3,
 Lambda, IAM, RDS…), fill in an action form, and see results as a table plus a
 raw-JSON inspector. Switch regions and profiles, and point at a local
